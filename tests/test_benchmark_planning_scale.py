@@ -5,6 +5,7 @@ import sys
 from datetime import UTC, datetime
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 from powdrr_service.planning.assembly import (
@@ -27,6 +28,7 @@ _SCRIPT_SPEC.loader.exec_module(_SCRIPT_MODULE)
 _BENCHMARK = cast(Any, _SCRIPT_MODULE)
 PROFILES = _BENCHMARK.PROFILES
 fixture_shape_mismatches = _BENCHMARK.fixture_shape_mismatches
+source_obligation_evaluation = _BENCHMARK.source_obligation_evaluation
 item_sizing_summary = _BENCHMARK.item_sizing_summary
 live_structural_issues = _BENCHMARK.live_structural_issues
 dependency_candidate_summary = _BENCHMARK.dependency_candidate_summary
@@ -38,6 +40,99 @@ planning_report_artifact_path = _BENCHMARK.planning_report_artifact_path
 write_planning_report_artifact = _BENCHMARK.write_planning_report_artifact
 progress_client = _BENCHMARK._ProgressClient
 example_answer_client: Any = _BENCHMARK._ExampleAnswerClient
+
+
+def test_source_obligation_evaluation_checks_exact_source_and_work_unit_coverage() -> (
+    None
+):
+    profile = PROFILES["typical"]
+    statements = [
+        f"Implement behavior outcome {ordinal} as a Python module."
+        for ordinal in range(1, profile.requirements + 1)
+    ]
+    requirements = [
+        SimpleNamespace(
+            id=f"req-{ordinal}",
+            statement=statement,
+            source_refs=(f"anchor-{ordinal}",),
+        )
+        for ordinal, statement in enumerate(statements, start=1)
+    ]
+    work_units = [
+        SimpleNamespace(
+            requirement_ids=tuple(
+                f"req-{ordinal}"
+                for ordinal in range(start, min(start + 4, len(requirements) + 1))
+            )
+        )
+        for start in range(1, len(requirements) + 1, 4)
+    ]
+
+    report = source_obligation_evaluation(
+        profile,
+        anchor_text_by_id={
+            f"anchor-{ordinal}": statement
+            for ordinal, statement in enumerate(statements, start=1)
+        },
+        requirements=requirements,
+        work_units=work_units,
+    )
+
+    assert report["status"] == "matched"
+    assert report["exact_source_statement_matches"] == profile.requirements
+    assert report["missing_work_unit_requirement_ids"] == []
+    assert report["duplicate_work_unit_requirement_ids"] == []
+    assert report["unknown_work_unit_requirement_ids"] == []
+
+
+def test_source_obligation_evaluation_reports_semantic_fixture_mismatches() -> None:
+    profile = PROFILES["typical"]
+    statements = [
+        f"Implement behavior outcome {ordinal} as a Python module."
+        for ordinal in range(1, profile.requirements + 1)
+    ]
+    requirements = [
+        SimpleNamespace(
+            id=f"req-{ordinal}",
+            statement=("Misstated obligation." if ordinal == 1 else statement),
+            source_refs=(f"anchor-{ordinal}",),
+        )
+        for ordinal, statement in enumerate(statements, start=1)
+    ]
+    work_units = [
+        SimpleNamespace(
+            requirement_ids=("req-1", "req-2", "req-2", "unknown-requirement")
+        )
+    ]
+
+    report = source_obligation_evaluation(
+        profile,
+        anchor_text_by_id={
+            f"anchor-{ordinal}": statement
+            for ordinal, statement in enumerate(statements, start=1)
+        },
+        requirements=requirements,
+        work_units=work_units,
+    )
+
+    assert report["status"] == "mismatch"
+    assert report["exact_source_statement_matches"] == profile.requirements - 1
+    assert report["source_binding_error_requirement_ids"] == ["req-1"]
+    assert report["duplicate_work_unit_requirement_ids"] == ["req-2"]
+    assert report["unknown_work_unit_requirement_ids"] == ["unknown-requirement"]
+
+
+def test_structural_stress_profile_compiles_the_reviewed_operation_set() -> None:
+    profile = PROFILES["structrr-stress"]
+    report = _BENCHMARK.run_profile(
+        profile,
+        repository_root=Path(__file__).resolve().parents[1],
+        enforce_fixture_shape=True,
+    )
+
+    assert report["terminal_status"] == "succeeded"
+    assert report["compile_error"] is None
+    assert report["source_obligation_evaluation"]["status"] == "matched"
 
 
 def test_provider_usage_summary_counts_batches_once_and_reports_live_metrics() -> None:
@@ -431,6 +526,10 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
             "reported_calls": 800,
             "unreported_calls": 100,
         },
+        "source_obligation_evaluation": {
+            "status": "mismatch",
+            "scope": "synthetic_source_and_assignment_checks_only",
+        },
         "max_batch_members_by_question_kind": {
             "extract_requirements": 6,
             "propose_work_units": 4,
@@ -485,6 +584,7 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
     assert summary["provider_api_calls"] == 900
     assert summary["provider_call_count"] == 900
     assert summary["reported_cost"]["status"] == "partial"
+    assert summary["source_obligation_evaluation"]["status"] == "mismatch"
     assert summary["max_batch_members_by_question_kind"] == {
         "extract_requirements": 6,
         "propose_work_units": 4,

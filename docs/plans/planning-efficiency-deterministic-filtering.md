@@ -317,6 +317,14 @@ These tasks should receive deterministic candidates, narrow evidence, bounded sc
 
 ## Scale and performance evaluation
 
+The benchmark report now includes `source_obligation_evaluation` for every
+profile. It compares extracted requirement statements and their pinned source
+anchors with the generated synthetic obligations, then checks that every
+accepted requirement is assigned to a work unit exactly once. Deterministic
+profiles fail on a mismatch; live profiles report the mismatch without treating
+structural success or exact wording as proof of semantic correctness. This is a
+synthetic regression check, not a general semantic quality score.
+
 Run three profiles with fixed source documents, pinned repository commits, and deterministic mock answers:
 
 1. **Typical:** 40 source blocks, 40 requirements, 16 work units, and 5 PR items.
@@ -684,6 +692,24 @@ controlled comparison because provider-generated questions and outputs vary.
 Token telemetry is unavailable. The 50-item fixture target was not met, while
 all actual item-size bounds passed. The report is saved at
 `/tmp/planning-extraction-six-live.json`.
+
+### Synthetic source-oracle and Structrr operation closure (2026-11-21)
+
+Every benchmark profile now reports exact matching of generated source
+obligations to extracted requirement statements and pinned anchors, plus whether
+each accepted requirement is assigned to exactly one work unit. Deterministic
+profiles fail on a mismatch; live profiles report the mismatch for review. This
+is a fixture-level regression check and does not rate paraphrases or general
+semantic quality.
+
+The Structrr stress profile also exposed a discrepancy between structural
+review and final compilation: review batched operations for all currently ready
+items against one projected state, while compilation rebuilt candidate questions
+one item at a time. That could create an unasked structural question after all
+answers had been accepted. Compilation now uses the canonical operation list
+produced by the validated review scheduler, preserving checkpointed decisions
+and their exact IDs. The typical, large, and Structrr-stress deterministic
+profiles now complete and satisfy their fixture checks.
 
 ## Cross-cutting test requirements
 

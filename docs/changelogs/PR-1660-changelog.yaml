@@ -1,0 +1,131 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1660
+title: Compare planning benchmarks with synthetic source obligations
+intent:
+  problem: Planning scale reports compare output shape but do not expose source-obligation extraction and work-unit assignment against the synthetic fixture; the Structrr stress profile can also reveal accepted structural work that compilation re-derives as a new question.
+  goal: Report source-bound fixture checks for every scale profile and compile exactly the structural operations accepted by the scheduler.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 849, end_line: 866}
+    summary: Record benchmark fixture checks and canonical structural operation carry-forward.
+    rationale: Distinguish measurable source and assignment invariants from broader semantic quality.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 320, end_line: 327}
+    summary: Define the source-obligation benchmark evaluation and its limits.
+    rationale: Keep synthetic fixture checks distinct from live semantic review.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 696, end_line: 713}
+    summary: Document source-oracle reporting and the Structrr stress-profile compile fix.
+    rationale: Record the discovered scheduler/compiler mismatch and verification evidence.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 559, end_line: 559}
+    summary: Add storage for canonical reviewed structural operations.
+    rationale: Let compilation consume the scheduler's validated result.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1996, end_line: 1996}
+    summary: Clear canonical operations before recomputing the structural review frontier.
+    rationale: Prevent stale operations from being reused after an incomplete review.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2327, end_line: 2327}
+    summary: Save operations after all ready structural reviews are accepted.
+    rationale: Preserve the operation list validated against the scheduler's projected baselines.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2327, end_line: 2400}
+    summary: Remove the second structural-subject reconstruction path.
+    rationale: Avoid generating unasked question identities during final compilation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2347, end_line: 2350}
+    summary: Require a completed canonical operation list before proposal compilation.
+    rationale: Fail clearly if structural review did not produce its validated result.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2419, end_line: 2419}
+    summary: Remove the compiler's independently accumulated operation list.
+    rationale: Keep one authoritative structural operation sequence.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2421, end_line: 2488}
+    summary: Remove per-item structural request rebuilding during compilation.
+    rationale: Prevent compiled state from diverging from the scheduler's reviewed projected state.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2358, end_line: 2358}
+    summary: Compile the proposal from the scheduler's canonical operation list.
+    rationale: Reuse accepted decisions and their checkpointed question IDs.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 119, end_line: 134}
+    summary: Preserve compact source-obligation evaluation metrics.
+    rationale: Show fixture results without expanding the compact report with diagnostics.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 224, end_line: 224}
+    summary: Add source-obligation evaluation to compact profile output.
+    rationale: Make fixture agreement visible in routine benchmark summaries.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 380, end_line: 463}
+    summary: Compare extracted statements, source anchors, and work-unit coverage with the synthetic fixture.
+    rationale: Measure source and assignment invariants without asserting general semantic quality.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1133, end_line: 1141}
+    summary: Evaluate accepted obligations against pinned synthetic anchors.
+    rationale: Use the exact profile source document as the fixture oracle.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1164, end_line: 1164}
+    summary: Store source-obligation results in the full benchmark report.
+    rationale: Retain detailed fixture diagnostics for later review.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1256, end_line: 1260}
+    summary: Fail deterministic profiles on source-oracle mismatch.
+    rationale: Make fixture regressions actionable while leaving live paraphrases available for review.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Import a lightweight record fixture for source-oracle tests.
+    rationale: Test evaluation metrics independently from provider execution.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 31, end_line: 31}
+    summary: Expose source-obligation evaluation to its tests.
+    rationale: Verify match and mismatch reporting directly.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 45, end_line: 137}
+    summary: Test exact source matching, requirement assignment, and stress-profile compilation.
+    rationale: Cover fixture mismatch diagnostics and reviewed-operation carry-forward.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 529, end_line: 532}
+    summary: Add source-evaluation data to the compact-summary fixture.
+    rationale: Confirm benchmark users can see the synthetic quality status.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 587, end_line: 587}
+    summary: Assert compact reports retain source-evaluation status.
+    rationale: Prevent the fixture result from disappearing from the console summary.
+entities: []
+entity_relationships: []
+invariants:
+  - id: planner-compilation-reuses-reviewed-structural-operations
+    action: added
+    description: Final Structrr proposal compilation uses the structural operations parsed and validated by the question scheduler; it does not independently rebuild structural-change questions.
+  - id: planning-benchmark-reports-source-obligation-fixture
+    action: added
+    description: Every benchmark profile reports exact synthetic source-statement and anchor matches plus exactly-once work-unit assignment; this is fixture evidence, not a general semantic quality score.
+guidance: []
+features: []
+proposed_prs: []

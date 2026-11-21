@@ -864,6 +864,17 @@ canonical operation list parsed by the scheduler, avoiding a second semantic
 interpretation of already-reviewed subjects. The deterministic Structrr-stress
 profile covers this path.
 
+Work-unit batching update: independent proposal questions are now batched in
+pairs, bounded by a 32,000-character combined input limit and the existing
+24,000-character per-member limit. Every member still uses its original schema,
+question ID, and parser. Checkpoints retain the parent batch question ID for
+failed members; replay splits those requirement groups into singleton requests.
+The deterministic large profile reduced work-unit proposal calls from 125 to
+63 and total calls from 303 to 241. This is a synthetic fixture measurement,
+not evidence that live model responses preserve all requested work-unit groups.
+Live-provider semantic completeness remains an evaluation gap, especially
+because earlier live responses omitted proposal groups.
+
 The default planning route has thirteen business question families plus three
 wrapper families. Nine dormant builders and eight older direct completion sites
 are catalogued separately to avoid inflating normal counts. A future refactor

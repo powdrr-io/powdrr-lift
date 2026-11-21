@@ -20,6 +20,7 @@ from powdrr_service.planning.inference import (
 
 MAX_QUESTION_INPUT_CHARS = 24_000
 MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS = 32_000
+MAX_WORK_UNIT_BATCH_INPUT_CHARS = 32_000
 MAX_SOURCE_BLOCK_CHARS = 8_000
 MAX_QUESTION_ANSWER_CHARS = 4_000
 MAX_WORK_UNIT_ANSWER_CHARS = 6_144
@@ -27,6 +28,7 @@ MAX_SEMANTIC_CORRECTIONS = 2
 __all__ = [
     "MAX_QUESTION_INPUT_CHARS",
     "MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS",
+    "MAX_WORK_UNIT_BATCH_INPUT_CHARS",
     "MAX_SOURCE_BLOCK_CHARS",
     "MAX_QUESTION_ANSWER_CHARS",
     "MAX_SEMANTIC_CORRECTIONS",
@@ -228,7 +230,7 @@ def batch_question_requests(
         batch_limit = max_batch_size or (
             6
             if request.question.kind == "extract_requirements"
-            else 1
+            else 2
             if request.question.kind == "propose_work_units"
             else 4
         )
@@ -294,24 +296,6 @@ def _build_question_batch(
     member_schemas = []
     for request in requests:
         member_schema = deepcopy(dict(request.answer_schema))
-        if request.question.kind == "propose_work_units":
-            # Per-member parsers enforce these IDs after the batch response. The
-            # child question facts carry the allowed IDs, so repeating large enum
-            # lists in every provider schema needlessly prevents useful batching.
-            answer_properties = member_schema["properties"]
-            record_properties = answer_properties["records"]["items"]["properties"]
-            record_properties["requirement_ids"]["items"].pop("enum", None)
-            planned_write_properties = record_properties["planned_writes"]["items"]
-            planned_write_properties["properties"]["source_refs"]["items"].pop(
-                "enum", None
-            )
-            planned_write_properties["properties"]["evidence_ids"]["items"].pop(
-                "enum", None
-            )
-            output_properties = record_properties["required_outputs"]["items"][
-                "properties"
-            ]
-            output_properties["requirement_ids"]["items"].pop("enum", None)
         member_schemas.append(member_schema)
     schema = {
         "type": "object",
@@ -411,6 +395,8 @@ def _build_question_batch(
         max_input_chars=(
             MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS
             if requests[0].question.kind == "extract_requirements"
+            else MAX_WORK_UNIT_BATCH_INPUT_CHARS
+            if requests[0].question.kind == "propose_work_units"
             else MAX_QUESTION_INPUT_CHARS
         ),
     )
@@ -438,6 +424,7 @@ class NeedsQuestionAnswer:
     attempts: int
     error: PlanningContractError
     previous_answer: Mapping[str, Any]
+    batch_question_id: str | None = None
 
     @property
     def question_id(self) -> str:

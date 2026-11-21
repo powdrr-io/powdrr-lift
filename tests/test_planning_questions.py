@@ -22,6 +22,7 @@ from powdrr_service.planning.questions import (
     MAX_QUESTION_INPUT_CHARS,
     MAX_SOURCE_BLOCK_CHARS,
     MAX_WORK_UNIT_ANSWER_CHARS,
+    MAX_WORK_UNIT_BATCH_INPUT_CHARS,
     ContextRecord,
     NeedsQuestionAnswer,
     QuestionInputTooLarge,
@@ -54,6 +55,7 @@ _VALID_PAGE = {
 
 def test_question_size_contract_constants_are_fixed() -> None:
     assert MAX_QUESTION_INPUT_CHARS == 24_000
+    assert MAX_WORK_UNIT_BATCH_INPUT_CHARS == 32_000
     assert MAX_SOURCE_BLOCK_CHARS == 8_000
     assert MAX_QUESTION_ANSWER_CHARS == 4_000
     assert MAX_WORK_UNIT_ANSWER_CHARS == 6_144
@@ -410,7 +412,7 @@ def test_batch_question_requests_keep_non_extraction_default_at_four() -> None:
         ) == {request.question.question_id: _VALID_PAGE for request in members}
 
 
-def test_work_unit_proposals_are_not_batched() -> None:
+def test_work_unit_proposals_batch_two_members_and_preserve_order() -> None:
     requests = tuple(
         _request(
             _question(
@@ -419,13 +421,17 @@ def test_work_unit_proposals_are_not_batched() -> None:
                 kind="propose_work_units",
             )
         )
-        for index in range(1, 4)
+        for index in range(1, 6)
     )
 
     batches = batch_question_requests(requests)
 
-    assert batches == requests
-    assert all(not batch.batch_members for batch in batches)
+    assert [len(batch.batch_members) for batch in batches] == [2, 2, 0]
+    assert [
+        member.question.question_id
+        for batch in batches
+        for member in (batch.batch_members or (batch,))
+    ] == [request.question.question_id for request in requests]
 
 
 def test_extraction_batch_uses_six_when_input_bound_allows() -> None:

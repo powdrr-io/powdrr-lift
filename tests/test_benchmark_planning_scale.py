@@ -135,6 +135,27 @@ def test_structural_stress_profile_compiles_the_reviewed_operation_set() -> None
     assert report["source_obligation_evaluation"]["status"] == "matched"
 
 
+def test_work_unit_proposal_batching_reduces_large_profile_call_count() -> None:
+    profile = _BENCHMARK.Profile(
+        "work-unit-batching",
+        requirements=40,
+        work_units=16,
+        plan_items=5,
+    )
+
+    report = _BENCHMARK.run_profile(
+        profile,
+        repository_root=Path(__file__).resolve().parents[1],
+        enforce_fixture_shape=True,
+    )
+
+    proposal_metrics = report["by_question_kind"]["propose_work_units"]
+    assert proposal_metrics["questions"] == 10
+    assert proposal_metrics["api_calls"] == 5
+    assert report["max_batch_members_by_question_kind"]["propose_work_units"] == 2
+    assert report["source_obligation_evaluation"]["status"] == "matched"
+
+
 def test_provider_usage_summary_counts_batches_once_and_reports_live_metrics() -> None:
     report = provider_usage_summary(
         (
@@ -728,9 +749,8 @@ def test_live_report_includes_dependency_candidate_and_confirmation_counts() -> 
         enforce_fixture_shape=True,
     )
 
-    # Proposal pages are asked individually because batched proposals were
-    # repeatedly omitting one of their requested work units.
-    assert report["by_question_kind"]["propose_work_units"]["api_calls"] == 2
+    # The two independent proposal pages share one bounded provider request.
+    assert report["by_question_kind"]["propose_work_units"]["api_calls"] == 1
     assert "check_requirement_fidelity" not in report["by_question_kind"]
     assert "assess_requirement_coverage" not in report["by_question_kind"]
     assert report["dependency_candidates"] == {

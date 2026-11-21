@@ -157,6 +157,7 @@ class PlanningCheckpoint:
         error: PlanningContractError,
         previous_answer: Mapping[str, Any],
         id_counters: Mapping[str, int],
+        batch_question_id: str | None = None,
         code_evidence_refs: Sequence[Mapping[str, Any]] = (),
         code_symbol_coverage: Sequence[Mapping[str, Any]] = (),
     ) -> PlanningCheckpoint:
@@ -168,6 +169,8 @@ class PlanningCheckpoint:
             "validation_result": error.to_data(),
             "state_transition": "needs_answer",
         }
+        if batch_question_id is not None:
+            payload["batch_question_id"] = batch_question_id
         if code_evidence_refs:
             payload["code_evidence_refs"] = [
                 dict(reference) for reference in code_evidence_refs

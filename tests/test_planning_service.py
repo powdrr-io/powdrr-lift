@@ -1018,7 +1018,7 @@ def test_procedrr_initialize_reopens_answer_invalidated_by_later_checkpoint() ->
     )
 
 
-def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> None:
+def test_failed_work_unit_responses_replay_as_singleton_groups() -> None:
     session_id = "session-oversized-work-units"
     store = InMemoryCheckpointStore(session_id=session_id)
     session = PlanningSession(
@@ -1079,11 +1079,35 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         id_counters={},
     )
     store.append(single_event, expected_parent_digest=event.digest)
+    incomplete_batch_question = Question(
+        question_id="propose-units-v10-batch-req-0061-example",
+        kind="propose_work_units",
+        contract_version=10,
+        subject_ids=("req-0061", "req-0062", "req-0063", "req-0064"),
+        input_digest="sha256:" + "2" * 64,
+        context_ref_ids=(),
+        expected_answer_schema="work-unit-proposals-v10",
+        attempt=1,
+    )
+    incomplete_batch_event = PlanningCheckpoint.needs_answer(
+        session_id=session_id,
+        event_id="needs-answer-000003",
+        sequence=3,
+        parent_digest=single_event.digest,
+        question=incomplete_batch_question,
+        error=PlanningContractError(
+            "/answers", "batch response has an invalid answer list"
+        ),
+        previous_answer={"answers": []},
+        id_counters={},
+        batch_question_id="batch-v2-failed-work-unit-proposal",
+    )
+    store.append(incomplete_batch_event, expected_parent_digest=single_event.digest)
 
     class _SplitCaptureMachine(_Machine):
         oversized_groups: tuple[tuple[str, ...], ...] = ()
 
-        def set_oversized_work_unit_groups(
+        def set_work_unit_groups_to_split(
             self, groups: tuple[tuple[str, ...], ...]
         ) -> None:
             self.oversized_groups = tuple(groups)
@@ -1102,6 +1126,7 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
     assert machine.oversized_groups == (
         ("req-0057", "req-0058", "req-0059", "req-0060"),
         ("req-0058",),
+        ("req-0061", "req-0062", "req-0063", "req-0064"),
     )
 
 

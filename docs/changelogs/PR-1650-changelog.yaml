@@ -1,0 +1,83 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1650
+title: Persist requirement bindings on planned test cases
+intent:
+  problem: The planner allocates stable requirement IDs and digests to each test case, but issue-worker Structrr diff artifacts omit those bindings when recording selectors and outcomes.
+  goal: Preserve and validate the exact planned requirement bindings on each committed required test case so downstream GitHub jobs can discover them without inferring links.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 346, end_line: 350}
+    summary: Document per-case bindings in issue-worker Structrr artifacts.
+    rationale: Describe how downstream target-repository jobs can find the pinned mapping.
+  - path: docs/guides/requirement-execution-receipts.md
+    type: modified
+    span: {start_line: 34, end_line: 42}
+    summary: Specify where target CI can read stable case selectors and requirement bindings.
+    rationale: Connect the receipt input contract to committed issue-worker artifacts.
+  - path: packages/service/src/powdrr_service/changelog/parser.py
+    type: modified
+    span: {start_line: 122, end_line: 122}
+    summary: Preserve requirement bindings on parsed required test cases.
+    rationale: Make the explicit mapping available to downstream changelog consumers.
+  - path: packages/service/src/powdrr_service/changelog/parser.py
+    type: modified
+    span: {start_line: 256, end_line: 263}
+    summary: Parse each case's requirement ID and digest pair.
+    rationale: Keep persisted bindings structured when reading Structrr diff artifacts.
+  - path: packages/service/src/powdrr_service/changelog/validation_policy.py
+    type: modified
+    span: {start_line: 437, end_line: 492}
+    summary: Validate binding shape, unique stable IDs, and SHA-256 digests.
+    rationale: Reject malformed or ambiguous requirement mappings at the changelog boundary.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1175, end_line: 1178}
+    summary: Validate compiler-owned bindings before writing the Structrr diff.
+    rationale: Carry only requirement mappings that match the compiled plan and its cases.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1231, end_line: 1231}
+    summary: Store each case's requirement bindings beside its selectors and status.
+    rationale: Make the planned relationship discoverable in the merged repository.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1343, end_line: 1428}
+    summary: Add deterministic validation and indexing for per-case bindings.
+    rationale: Reject unallocated IDs, digest drift, duplicates, and missing cases.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span: {start_line: 77, end_line: 82}
+    summary: Add a valid requirement binding to the changelog parser fixture.
+    rationale: Verify the field survives changelog parsing.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span: {start_line: 102, end_line: 107}
+    summary: Assert parsed requirement ID and digest values.
+    rationale: Confirm downstream consumers receive the exact binding.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span: {start_line: 122, end_line: 145}
+    summary: Reject duplicate IDs and malformed requirement digests.
+    rationale: Keep invalid binding records out of committed changelogs.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1465, end_line: 1481}
+    summary: Supply compiler-owned requirement bindings to the issue-worker writer test.
+    rationale: Exercise the production input shape.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1519, end_line: 1524}
+    summary: Assert case bindings are persisted with the generated Structrr diff.
+    rationale: Ensure requirement links survive artifact generation.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1532, end_line: 1557}
+    summary: Reject per-case digest drift from the compiled requirement binding.
+    rationale: Prevent a case from being rebound to altered requirement wording.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

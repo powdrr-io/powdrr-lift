@@ -1,0 +1,96 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1655
+title: Validate source logic at executable test design
+intent:
+  problem: The planner forwards source-logic objects into test design after only shallow shape checks, and excerpt limits can omit anchors needed to validate accepted quotes.
+  goal: Revalidate bounded source-logic trees against all pinned requirement anchors and preserve the complete nested structure through generated execution bindings.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 17, end_line: 21}
+    summary: Update milestone 3 status for deterministic source-logic validation and carry-forward.
+    rationale: Reflect the implemented executable test-design boundary.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 764, end_line: 773}
+    summary: Document anchor-bound source-logic validation and nested execution bindings.
+    rationale: Distinguish deterministic preservation from semantic scenario review.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 807, end_line: 811}
+    summary: Reconcile remaining milestone 3 work.
+    rationale: Retain semantic quality measurement as an open item.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 813, end_line: 815}
+    summary: Replace source-logic implementation gaps with semantic review and measurement.
+    rationale: Keep remaining work aligned with the completed deterministic boundary.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1894, end_line: 1901}
+    summary: Build private pinned-anchor text for every requirement source reference.
+    rationale: Validate quotes even when prompt excerpts are capped.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1922, end_line: 1922}
+    summary: Pass pinned-anchor text to the test-design request builder.
+    rationale: Keep full source verification separate from excerpt-limited model context.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1927, end_line: 1927}
+    summary: Pass accepted requirement source references into test design.
+    rationale: Restrict logic to anchors cited by each requirement.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 26, end_line: 26}
+    summary: Import the existing bounded source-logic parser.
+    rationale: Reuse the source extraction contract at the test-design boundary.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 132, end_line: 132}
+    summary: Accept the pinned source-anchor text map.
+    rationale: Validate against all requirement anchors without expanding model prompts.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 151, end_line: 162}
+    summary: Select and validate pinned anchor text for source-logic parsing.
+    rationale: Make quote validation deterministic and independent of prompt excerpt limits.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 213, end_line: 235}
+    summary: Enforce requirement source-reference membership and parse each bounded logic tree.
+    rationale: Reject malformed operators, unpinned quotes, and uncited anchors before model use.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 82, end_line: 105}
+    summary: Define a nested source-logic compiler fixture covering every operator.
+    rationale: Exercise conditional, all_of, ordered, and any_of carry-forward together.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 748, end_line: 748}
+    summary: Use nested source logic in the planning manifest fixture.
+    rationale: Exercise realistic multi-operator requirement bindings.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 849, end_line: 849}
+    summary: Assert the nested logic digest is carried into generated workflow bindings.
+    rationale: Verify test-case requirements remain bound to full source semantics.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 156, end_line: 328}
+    summary: Test nested logic acceptance, pinned quote/ref validation, and rejection of malformed trees.
+    rationale: Cover the deterministic test-design boundary, including anchors outside the prompt excerpt set.
+entities: []
+entity_relationships: []
+invariants:
+  - id: source-logic-is-bound-at-test-design
+    action: added
+    description: Before a test-design request is built, every source-logic tree is parsed against pinned anchor text and every referenced anchor must be listed by its requirement.
+  - id: source-logic-carry-forward-is-complete
+    action: added
+    description: Generated workflow requirement bindings retain nested source-logic structure and bind it to each associated test case.
+guidance: []
+features: []
+proposed_prs: []

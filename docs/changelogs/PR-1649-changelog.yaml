@@ -9,18 +9,48 @@ structured_files: []
 files:
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 253, end_line: 254}
+    span: {start_line: 253, end_line: 253}
     summary: Carry accepted work-item identity and its input contract digest in the durable claim record.
     rationale: Let replacement workers bind claim history to the same reviewed obligation.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 267, end_line: 267}
+    summary: Retain work-item identity on the active claim object.
+    rationale: Preserve identity as ownership heartbeats update the record.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 439, end_line: 439}
+    summary: Persist work-item identity with each claim generation.
+    rationale: Make identity available to a replacement worker after a crash.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1718, end_line: 1727}
+    summary: Bind a new claim to repository, issue, plan item, and current input contract.
+    rationale: Ensure ownership refers to the reviewed item version.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 59, end_line: 59}
-    summary: Verify work identity remains attached when claim generation advances after recovery.
+    span: {start_line: 59, end_line: 66}
+    summary: Bind the test claim to a complete work-item identity.
     rationale: Guard ownership continuity across worker replacement.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 73, end_line: 73}
+    summary: Assert the active durable claim stores the work-item identity.
+    rationale: Verify the claim record binds to accepted work.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 78, end_line: 78}
+    summary: Recover the claim with the same accepted work identity.
+    rationale: Verify replacement workers continue the same work item.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 85, end_line: 85}
+    summary: Assert identity remains after ownership generation advances.
+    rationale: Guard against losing the work contract during recovery.
 entities:
   - id: github-issue-worker-claim
     type: Technical specification
-    action: modified
+    action: added
 entity_relationships: []
 invariants: []
 guidance: []

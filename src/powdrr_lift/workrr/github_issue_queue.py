@@ -475,7 +475,7 @@ def _mark_abandoned_claims_for_reconciliation(
 ) -> None:
     """Fence crashed owners; a new attempt needs explicit state reconciliation."""
     directory = _worker_store_root(repo_root) / "claims"
-    for issue in client.list_issues(labels=(QUEUE_LABELS["claimed"],), state="open"):
+    for issue in client.list_issues(state="open"):
         claim_path = directory / f"issue-{issue.number}.json"
         record = _read_json_mapping(claim_path)
         if record.get("state") != "running":
@@ -502,8 +502,8 @@ def _mark_abandoned_claims_for_reconciliation(
             refreshed,
             "Powdrr found that the previous worker exited while holding this item. "
             "The item was fenced to prevent duplicate commits or publication. "
-            "Reconcile its durable checkpoint, worktree, and any pull request, then "
-            "move it back to `powdrr:ready` to resume.",
+            "The worker retains responsibility for reconciling the durable "
+            "checkpoint, worktree, and any pull request before resuming.",
         )
 
 

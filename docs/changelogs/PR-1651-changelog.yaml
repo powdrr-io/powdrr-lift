@@ -1,0 +1,38 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1651
+title: Discover abandoned claims without queue labels
+intent:
+  problem: An open issue with an abandoned durable worker claim can become invisible when its queue label is missing or stale.
+  goal: Discover abandoned claims from the open issue inventory and retain agent responsibility in the durable reconciliation state.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 478, end_line: 478}
+    summary: Scan open issues for abandoned claims regardless of queue label.
+    rationale: Keep inconsistent work discoverable when GitHub label projection is stale.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 505, end_line: 506}
+    summary: State that the worker retains responsibility for reconciliation.
+    rationale: Avoid handing worker bookkeeping to a human operator.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 155, end_line: 156}
+    summary: Verify an abandoned claim is found when its issue has no queue label.
+    rationale: Guard discovery against stale queue projections.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 187, end_line: 187}
+    summary: Verify the diagnostic keeps reconciliation responsibility with the worker.
+    rationale: Preserve the protocol ownership contract.
+entities:
+  - id: github-worker-abandoned-claim-discovery
+    type: Technical specification
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

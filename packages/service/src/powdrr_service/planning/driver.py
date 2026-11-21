@@ -536,6 +536,7 @@ class SourceLedgerQuestionMachine:
         self._invalid_accepted_question_ids: set[str] = set()
         self._accepted_question_input_digests: dict[str, str] | None = None
         self._work_unit_groups_to_split: set[tuple[str, ...]] = set()
+        self._question_groups_to_split: set[tuple[str, tuple[str, ...]]] = set()
         self._max_question_frontier: int | None = None
         self._single_proposal_requirements: set[str] = set()
         self._supplemental_work_unit_requirements: set[str] = set()
@@ -585,6 +586,16 @@ class SourceLedgerQuestionMachine:
             group[0] for group in groups if len(group) == 1
         }
 
+    def set_question_groups_to_split(
+        self, groups: Sequence[tuple[str, Sequence[str]]]
+    ) -> None:
+        """Retry failed batch members as separate questions after journal replay."""
+        self._question_groups_to_split = {
+            (kind, tuple(subject_ids))
+            for kind, subject_ids in groups
+            if kind and subject_ids
+        }
+
     def set_accepted_question_input_digests(
         self, input_digests: Mapping[str, str]
     ) -> None:
@@ -602,12 +613,30 @@ class SourceLedgerQuestionMachine:
     ) -> tuple[QuestionRequest[Any], ...]:
         if self._max_question_frontier is not None:
             requests = requests[: self._max_question_frontier]
-        if requests and all(
-            request.question.kind == "review_dependency_candidate"
-            for request in requests
-        ):
-            return tuple(requests)
-        return batch_question_requests(requests)
+        batches: list[QuestionRequest[Any]] = []
+        pending: list[QuestionRequest[Any]] = []
+
+        def flush() -> None:
+            if not pending:
+                return
+            if all(
+                request.question.kind == "review_dependency_candidate"
+                for request in pending
+            ):
+                batches.extend(pending)
+            else:
+                batches.extend(batch_question_requests(pending))
+            pending.clear()
+
+        for request in requests:
+            group = (request.question.kind, request.question.subject_ids)
+            if group in self._question_groups_to_split:
+                flush()
+                batches.append(request)
+            else:
+                pending.append(request)
+        flush()
+        return tuple(batches)
 
     def repository_search_metrics(self) -> tuple[tuple[str, Mapping[str, Any]], ...]:
         """Return counts from completed searches without exposing evidence text."""

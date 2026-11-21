@@ -1103,14 +1103,47 @@ def test_failed_work_unit_responses_replay_as_singleton_groups() -> None:
         batch_question_id="batch-v2-failed-work-unit-proposal",
     )
     store.append(incomplete_batch_event, expected_parent_digest=single_event.digest)
+    failed_test_batch_question = Question(
+        question_id="plan-tests-item-0061-example",
+        kind="plan_test_coverage",
+        contract_version=8,
+        subject_ids=("item-0061",),
+        input_digest="sha256:" + "3" * 64,
+        context_ref_ids=(),
+        expected_answer_schema="plan-test-coverage-v8",
+        attempt=1,
+    )
+    failed_test_batch_event = PlanningCheckpoint.needs_answer(
+        session_id=session_id,
+        event_id="needs-answer-000004",
+        sequence=4,
+        parent_digest=incomplete_batch_event.digest,
+        question=failed_test_batch_question,
+        error=PlanningContractError(
+            "/answers", "batch response has an invalid answer list"
+        ),
+        previous_answer={"answers": []},
+        id_counters={},
+        batch_question_id="batch-v2-failed-test-coverage",
+    )
+    store.append(
+        failed_test_batch_event,
+        expected_parent_digest=incomplete_batch_event.digest,
+    )
 
     class _SplitCaptureMachine(_Machine):
         oversized_groups: tuple[tuple[str, ...], ...] = ()
+        question_groups: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
         def set_work_unit_groups_to_split(
             self, groups: tuple[tuple[str, ...], ...]
         ) -> None:
             self.oversized_groups = tuple(groups)
+
+        def set_question_groups_to_split(
+            self, groups: tuple[tuple[str, tuple[str, ...]], ...]
+        ) -> None:
+            self.question_groups = tuple(groups)
 
     machine = _SplitCaptureMachine()
     transition = advance_planning_session(
@@ -1127,6 +1160,10 @@ def test_failed_work_unit_responses_replay_as_singleton_groups() -> None:
         ("req-0057", "req-0058", "req-0059", "req-0060"),
         ("req-0058",),
         ("req-0061", "req-0062", "req-0063", "req-0064"),
+    )
+    assert machine.question_groups == (
+        ("propose_work_units", ("req-0061", "req-0062", "req-0063", "req-0064")),
+        ("plan_test_coverage", ("item-0061",)),
     )
 
 

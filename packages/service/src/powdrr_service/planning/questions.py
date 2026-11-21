@@ -21,6 +21,7 @@ from powdrr_service.planning.inference import (
 MAX_QUESTION_INPUT_CHARS = 24_000
 MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS = 32_000
 MAX_WORK_UNIT_BATCH_INPUT_CHARS = 32_000
+MAX_TEST_COVERAGE_BATCH_INPUT_CHARS = 48_000
 MAX_SOURCE_BLOCK_CHARS = 8_000
 MAX_QUESTION_ANSWER_CHARS = 4_000
 MAX_WORK_UNIT_ANSWER_CHARS = 6_144
@@ -29,6 +30,7 @@ __all__ = [
     "MAX_QUESTION_INPUT_CHARS",
     "MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS",
     "MAX_WORK_UNIT_BATCH_INPUT_CHARS",
+    "MAX_TEST_COVERAGE_BATCH_INPUT_CHARS",
     "MAX_SOURCE_BLOCK_CHARS",
     "MAX_QUESTION_ANSWER_CHARS",
     "MAX_SEMANTIC_CORRECTIONS",
@@ -231,7 +233,7 @@ def batch_question_requests(
             6
             if request.question.kind == "extract_requirements"
             else 2
-            if request.question.kind == "propose_work_units"
+            if request.question.kind in {"propose_work_units", "plan_test_coverage"}
             else 4
         )
         if pending and (
@@ -397,6 +399,8 @@ def _build_question_batch(
             if requests[0].question.kind == "extract_requirements"
             else MAX_WORK_UNIT_BATCH_INPUT_CHARS
             if requests[0].question.kind == "propose_work_units"
+            else MAX_TEST_COVERAGE_BATCH_INPUT_CHARS
+            if requests[0].question.kind == "plan_test_coverage"
             else MAX_QUESTION_INPUT_CHARS
         ),
     )

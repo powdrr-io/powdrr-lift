@@ -1259,7 +1259,13 @@ def run_profile(
             f"{source_obligation_metrics}"
         )
     batch_limits = {
-        kind: 6 if kind == "extract_requirements" else 4
+        kind: (
+            6
+            if kind == "extract_requirements"
+            else 2
+            if kind in {"propose_work_units", "plan_test_coverage"}
+            else 4
+        )
         for kind in max_batch_members_by_question_kind
     }
     for kind, batch_size in max_batch_members_by_question_kind.items():

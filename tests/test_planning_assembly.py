@@ -34,6 +34,7 @@ from powdrr_service.planning.plan_sizing import (
 )
 from powdrr_service.planning.questions import (
     MAX_QUESTION_INPUT_CHARS,
+    SourceExcerpt,
     batch_question_requests,
     build_question_messages,
 )
@@ -43,6 +44,7 @@ from powdrr_service.planning.source import (
     Requirement,
     segment_markdown_source,
 )
+from powdrr_service.planning.test_coverage import build_test_coverage_request
 
 
 def _context(
@@ -1373,3 +1375,29 @@ def test_cohesion_split_can_allocate_one_requirement_to_multiple_units() -> None
 
     assert result.decision == "split"
     assert len(result.replacements) == 2
+
+
+def test_failed_batched_question_replays_alone_while_other_members_stay_batched() -> (
+    None
+):
+    context, anchor = _context()
+    machine = SourceLedgerQuestionMachine(context.source)
+    requests = tuple(
+        build_test_coverage_request(
+            {"id": f"item-{index}", "acceptance_criteria": [f"Criterion {index}."]},
+            source_excerpts=(SourceExcerpt(anchor, "The source-defined behavior."),),
+        )
+        for index in range(3)
+    )
+
+    machine.set_question_groups_to_split(
+        (("plan_test_coverage", requests[0].question.subject_ids),)
+    )
+    batches = machine._batch_requests(requests)
+
+    assert [len(request.batch_members) for request in batches] == [0, 2]
+    assert batches[0].question.question_id == requests[0].question.question_id
+    assert [member.question.question_id for member in batches[1].batch_members] == [
+        requests[1].question.question_id,
+        requests[2].question.question_id,
+    ]

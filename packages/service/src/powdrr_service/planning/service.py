@@ -262,10 +262,16 @@ class PlanningTransition:
 
 def _replay_planning_answers(
     events: Sequence[Any],
-) -> tuple[dict[str, Mapping[str, Any]], dict[str, str], list[tuple[str, ...]]]:
+) -> tuple[
+    dict[str, Mapping[str, Any]],
+    dict[str, str],
+    list[tuple[str, ...]],
+    list[tuple[str, tuple[str, ...]]],
+]:
     accepted: dict[str, Mapping[str, Any]] = {}
     input_digests: dict[str, str] = {}
     work_unit_groups_to_split: list[tuple[str, ...]] = []
+    question_groups_to_split: list[tuple[str, tuple[str, ...]]] = []
     for event in events:
         question = event.payload.get("question")
         if not isinstance(question, Mapping):
@@ -285,20 +291,35 @@ def _replay_planning_answers(
             input_digests.pop(question_id, None)
             validation_result = event.payload.get("validation_result")
             subject_ids = question.get("subject_ids")
+            batch_question_id = event.payload.get("batch_question_id")
+            kind = question.get("kind")
             if (
-                question.get("kind") == "propose_work_units"
+                isinstance(batch_question_id, str)
+                and isinstance(kind, str)
+                and isinstance(subject_ids, list)
+                and subject_ids
+                and all(isinstance(item, str) for item in subject_ids)
+            ):
+                question_groups_to_split.append((kind, tuple(subject_ids)))
+            if (
+                kind == "propose_work_units"
                 and isinstance(validation_result, Mapping)
                 and isinstance(validation_result.get("message"), str)
                 and (
                     validation_result["message"].startswith("serialized answer is ")
                     or validation_result["message"].startswith("batch response ")
-                    or isinstance(event.payload.get("batch_question_id"), str)
+                    or isinstance(batch_question_id, str)
                 )
                 and isinstance(subject_ids, list)
                 and all(isinstance(item, str) for item in subject_ids)
             ):
                 work_unit_groups_to_split.append(tuple(subject_ids))
-    return accepted, input_digests, work_unit_groups_to_split
+    return (
+        accepted,
+        input_digests,
+        work_unit_groups_to_split,
+        question_groups_to_split,
+    )
 
 
 class PlanningStateMachine(Protocol):
@@ -563,13 +584,21 @@ def advance_planning_session(
             f"planning journal is {journal.status}; select a valid checkpoint "
             "before continuing"
         )
-    accepted, accepted_input_digests, work_unit_groups_to_split = (
-        _replay_planning_answers(journal.events)
-    )
+    (
+        accepted,
+        accepted_input_digests,
+        work_unit_groups_to_split,
+        question_groups_to_split,
+    ) = _replay_planning_answers(journal.events)
 
     set_groups_to_split = getattr(state_machine, "set_work_unit_groups_to_split", None)
     if callable(set_groups_to_split):
         set_groups_to_split(work_unit_groups_to_split)
+    set_question_groups_to_split = getattr(
+        state_machine, "set_question_groups_to_split", None
+    )
+    if callable(set_question_groups_to_split):
+        set_question_groups_to_split(question_groups_to_split)
 
     set_accepted_input_digests = getattr(
         state_machine, "set_accepted_question_input_digests", None
@@ -1435,14 +1464,22 @@ def planning_operation_executor(
                 raise PlanningJournalError(
                     f"planning journal is {journal.status}; select a valid checkpoint"
                 )
-            accepted, input_digests, groups_to_split = _replay_planning_answers(
-                journal.events
-            )
+            (
+                accepted,
+                input_digests,
+                groups_to_split,
+                question_groups_to_split,
+            ) = _replay_planning_answers(journal.events)
             set_groups_to_split = getattr(
                 state_machine, "set_work_unit_groups_to_split", None
             )
             if callable(set_groups_to_split):
                 set_groups_to_split(groups_to_split)
+            set_question_groups_to_split = getattr(
+                state_machine, "set_question_groups_to_split", None
+            )
+            if callable(set_question_groups_to_split):
+                set_question_groups_to_split(question_groups_to_split)
             set_input_digests = getattr(
                 state_machine, "set_accepted_question_input_digests", None
             )

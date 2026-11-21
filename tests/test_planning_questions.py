@@ -21,6 +21,8 @@ from powdrr_service.planning.questions import (
     MAX_QUESTION_ANSWER_CHARS,
     MAX_QUESTION_INPUT_CHARS,
     MAX_SOURCE_BLOCK_CHARS,
+    MAX_STRUCTURAL_CHANGE_BATCH_INPUT_CHARS,
+    MAX_STRUCTURAL_ENUMERATION_BATCH_INPUT_CHARS,
     MAX_WORK_UNIT_ANSWER_CHARS,
     MAX_WORK_UNIT_BATCH_INPUT_CHARS,
     ContextRecord,
@@ -443,6 +445,50 @@ def test_extraction_batch_uses_six_when_input_bound_allows() -> None:
     (batch,) = batch_question_requests(requests)
 
     assert len(batch.batch_members) == 6
+    assert batch.parse_answer({"answers": [_VALID_PAGE for _request in requests]}) == {
+        request.question.question_id: _VALID_PAGE for request in requests
+    }
+
+
+def test_structural_change_batch_uses_six_members() -> None:
+    requests = tuple(
+        _request(
+            _question(
+                f"q-{index:06d}",
+                f"structural-subject-{index:02d}",
+                kind="describe_structural_change",
+            )
+        )
+        for index in range(1, 7)
+    )
+
+    (batch,) = batch_question_requests(requests)
+
+    assert MAX_STRUCTURAL_CHANGE_BATCH_INPUT_CHARS == 48_000
+    assert len(batch.batch_members) == 6
+    assert batch.max_input_chars == MAX_STRUCTURAL_CHANGE_BATCH_INPUT_CHARS
+    assert batch.parse_answer({"answers": [_VALID_PAGE for _request in requests]}) == {
+        request.question.question_id: _VALID_PAGE for request in requests
+    }
+
+
+def test_structural_enumeration_batch_uses_six_members() -> None:
+    requests = tuple(
+        _request(
+            _question(
+                f"q-{index:06d}",
+                f"structural-item-{index:02d}",
+                kind="enumerate_structural_subjects",
+            )
+        )
+        for index in range(1, 7)
+    )
+
+    (batch,) = batch_question_requests(requests)
+
+    assert MAX_STRUCTURAL_ENUMERATION_BATCH_INPUT_CHARS == 48_000
+    assert len(batch.batch_members) == 6
+    assert batch.max_input_chars == MAX_STRUCTURAL_ENUMERATION_BATCH_INPUT_CHARS
     assert batch.parse_answer({"answers": [_VALID_PAGE for _request in requests]}) == {
         request.question.question_id: _VALID_PAGE for request in requests
     }

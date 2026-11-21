@@ -740,6 +740,25 @@ test-design calls fell from 50 to 25 and total provider calls fell from 241 to
 fixture oracle, with no validation retries. This synthetic result measures call
 reduction only; live-provider completeness remains unmeasured.
 
+### Bounded Structrr change-description batches (2026-11-21)
+
+Independent `describe_structural_change` questions now batch up to six at a
+time, with a dedicated 48,000-character combined input limit and the existing
+24,000-character per-member limit. Member schemas and parsers are unchanged.
+Failed batch members retain their parent batch ID and replay separately, while
+unaffected questions remain batchable. In the deterministic Structrr-stress
+profile, description calls fell from 545 to 404 and total calls fell from 564
+to 423 (25.0%). All 2,151 structural questions passed validation, the profile
+compiled, and no validation retries were needed. This synthetic result does not
+measure live-model completeness for structural descriptions.
+
+The same bounded batching now applies to independent structural-subject
+enumeration questions. In the large profile, enumeration calls fell from 34 to
+12 for 50 questions, and total calls fell from 216 to 194 (10.2%). In the
+Structrr-stress profile, enumeration fell from three calls to one while all
+2,151 structural descriptions remained valid. The combined all-profile run
+passed every fixture and compiled without retries.
+
 ## Cross-cutting test requirements
 
 - Use mocked nontrivial provider responses. Do not use live-model calls as the only proof that a contract works.

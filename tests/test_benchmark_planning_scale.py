@@ -133,6 +133,19 @@ def test_structural_stress_profile_compiles_the_reviewed_operation_set() -> None
     assert report["terminal_status"] == "succeeded"
     assert report["compile_error"] is None
     assert report["source_obligation_evaluation"]["status"] == "matched"
+    structural_metrics = report["by_question_kind"]["describe_structural_change"]
+    assert structural_metrics["questions"] == 2_151
+    assert structural_metrics["api_calls"] == 404
+    assert (
+        report["max_batch_members_by_question_kind"]["describe_structural_change"] == 6
+    )
+    enumeration_metrics = report["by_question_kind"]["enumerate_structural_subjects"]
+    assert enumeration_metrics["questions"] == 5
+    assert enumeration_metrics["api_calls"] == 1
+    assert (
+        report["max_batch_members_by_question_kind"]["enumerate_structural_subjects"]
+        == 5
+    )
 
 
 def test_work_unit_proposal_batching_reduces_large_profile_call_count() -> None:

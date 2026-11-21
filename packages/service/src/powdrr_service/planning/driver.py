@@ -1891,6 +1891,14 @@ class SourceLedgerQuestionMachine:
                     requirement.id: requirement for requirement in item_requirements
                 }.values()
             )
+            source_anchor_text_by_ref = {
+                source_ref: self.source.document.text[
+                    anchors[source_ref].start_offset : anchors[source_ref].end_offset
+                ]
+                for requirement in item_requirements
+                for source_ref in requirement.source_refs
+                if source_ref in anchors
+            }
             test_paths = tuple(
                 sorted(
                     path
@@ -1911,10 +1919,12 @@ class SourceLedgerQuestionMachine:
                 },
                 existing_test_paths=test_paths,
                 source_excerpts=excerpts,
+                source_anchor_text_by_ref=source_anchor_text_by_ref,
                 requirements=tuple(
                     {
                         "id": requirement.id,
                         "statement": requirement.statement,
+                        "source_refs": list(requirement.source_refs),
                         "source_validation_groups": [
                             {"id": group_id, "relation": relation}
                             for group_id, relation in (

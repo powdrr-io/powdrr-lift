@@ -23,6 +23,7 @@ from powdrr_service.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
 )
+from powdrr_service.planning.source_logic import SourceLogicError, parse_source_logic
 
 TEST_TYPES = ("unit", "integration", "end_to_end", "contract")
 _MAX_TEXT_LENGTH = 1_000
@@ -128,6 +129,7 @@ def build_test_coverage_request(
     existing_test_paths: Sequence[str] = (),
     source_excerpts: Sequence[SourceExcerpt] = (),
     requirements: Sequence[Mapping[str, Any]] = (),
+    source_anchor_text_by_ref: Mapping[str, str] | None = None,
 ) -> QuestionRequest[dict[str, Any]]:
     """Ask for one concrete test design per accepted PR criterion."""
     item_id = item.get("id")
@@ -146,6 +148,18 @@ def build_test_coverage_request(
     normalized_criteria = tuple(
         value.strip() for value in cast(Sequence[str], criteria)
     )
+    source_text_by_ref = (
+        {excerpt.ref_id: excerpt.text for excerpt in source_excerpts}
+        if source_anchor_text_by_ref is None
+        else dict(source_anchor_text_by_ref)
+    )
+    if any(
+        not isinstance(source_ref, str) or not isinstance(source_text, str)
+        for source_ref, source_text in source_text_by_ref.items()
+    ):
+        raise PlanningContractError(
+            "/source_anchor_text_by_ref", "must map source anchor IDs to text"
+        )
     normalized_requirements: list[dict[str, Any]] = []
     for index, requirement in enumerate(requirements):
         requirement_id = requirement.get("id")
@@ -196,9 +210,29 @@ def build_test_coverage_request(
                 "must be a list of typed source logic expressions",
             )
         if source_logic:
-            normalized_requirement["source_logic"] = [
-                dict(expression) for expression in source_logic
-            ]
+            source_refs = requirement.get("source_refs", tuple(source_text_by_ref))
+            if (
+                not isinstance(source_refs, Sequence)
+                or isinstance(source_refs, (str, bytes))
+                or not all(isinstance(source_ref, str) for source_ref in source_refs)
+            ):
+                raise PlanningContractError(
+                    f"/requirements/{index}/source_refs",
+                    "must contain source anchor IDs",
+                )
+            try:
+                normalized_requirement["source_logic"] = [
+                    parse_source_logic(
+                        expression,
+                        source_text_by_ref=source_text_by_ref,
+                        allowed_source_refs=set(source_refs),
+                    )
+                    for expression in source_logic
+                ]
+            except SourceLogicError as error:
+                raise PlanningContractError(
+                    f"/requirements/{index}/source_logic", str(error)
+                ) from error
         normalized_requirements.append(normalized_requirement)
     if len({entry["id"] for entry in normalized_requirements}) != len(
         normalized_requirements

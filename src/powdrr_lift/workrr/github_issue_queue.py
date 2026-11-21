@@ -4744,6 +4744,29 @@ def _pull_request_validation_inventory(
         shutil.rmtree(temporary_root, ignore_errors=True)
 
 
+def _pull_request_head_is_from_repository(
+    repository: object,
+    owner: object,
+    target_repository: str,
+) -> bool:
+    """Match PR head identity when GitHub redacts nameWithOwner for private repos."""
+    if not isinstance(repository, Mapping):
+        return False
+    name_with_owner = repository.get("nameWithOwner")
+    if isinstance(name_with_owner, str) and name_with_owner.strip():
+        return name_with_owner.strip().casefold() == target_repository.casefold()
+    name = repository.get("name")
+    owner_login = owner.get("login") if isinstance(owner, Mapping) else None
+    if not isinstance(name, str) or not name.strip():
+        return False
+    if not isinstance(owner_login, str) or not owner_login.strip():
+        return False
+    return (
+        f"{owner_login.strip()}/{name.strip()}".casefold()
+        == target_repository.casefold()
+    )
+
+
 def _refresh_pull_request_validation_baseline(
     *,
     client: GitHubIssueClient,
@@ -4758,7 +4781,7 @@ def _refresh_pull_request_validation_baseline(
             "view",
             str(pull_request_number),
             "--json",
-            "headRefOid,headRefName,headRepository,baseRefName,title",
+            "headRefOid,headRefName,headRepository,headRepositoryOwner,baseRefName,title",
         ],
         check=False,
     )
@@ -4774,9 +4797,7 @@ def _refresh_pull_request_validation_baseline(
     base_branch = metadata.get("baseRefName")
     title = metadata.get("title")
     repository = metadata.get("headRepository")
-    repository_name = (
-        repository.get("nameWithOwner") if isinstance(repository, Mapping) else None
-    )
+    repository_owner = metadata.get("headRepositoryOwner")
     if (
         not isinstance(branch, str)
         or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", branch) is None
@@ -4786,7 +4807,9 @@ def _refresh_pull_request_validation_baseline(
         or ".." in base_branch.split("/")
         or not isinstance(title, str)
         or not title.strip()
-        or repository_name != client.repository
+        or not _pull_request_head_is_from_repository(
+            repository, repository_owner, client.repository
+        )
     ):
         return None
 

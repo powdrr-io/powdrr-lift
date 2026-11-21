@@ -3955,6 +3955,111 @@ def test_required_ci_accepts_changed_validation_inputs_with_fresh_pr_baseline(
     }
 
 
+@pytest.mark.parametrize(
+    ("repository", "owner", "expected"),
+    [
+        (
+            {"nameWithOwner": "powdrr-io/powdrr-gaterr", "name": "powdrr-gaterr"},
+            None,
+            True,
+        ),
+        (
+            {"id": "R_kgDOVNdwkg", "name": "powdrr-gaterr", "nameWithOwner": ""},
+            {"login": "powdrr-io"},
+            True,
+        ),
+        (
+            {"id": "R_fork", "name": "powdrr-gaterr", "nameWithOwner": ""},
+            {"login": "another-owner"},
+            False,
+        ),
+        ({"nameWithOwner": "another-owner/powdrr-gaterr"}, None, False),
+    ],
+)
+def test_private_pull_request_head_repository_identity(
+    repository: object,
+    owner: object,
+    expected: bool,
+) -> None:
+    assert (
+        github_issue_queue._pull_request_head_is_from_repository(
+            repository,
+            owner,
+            "powdrr-io/powdrr-gaterr",
+        )
+        is expected
+    )
+
+
+def test_private_pull_request_baseline_refresh_uses_repository_owner_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected_head = "c" * 40
+    requested_fields: list[str] = []
+
+    class PrivateRepositoryClient:
+        repository = "powdrr-io/powdrr-gaterr"
+
+        def _invoke(
+            self, arguments: list[str] | tuple[str, ...], *, check: bool = True
+        ) -> subprocess.CompletedProcess[str]:
+            del check
+            requested_fields.extend(arguments)
+            return subprocess.CompletedProcess(
+                ["gh", *arguments],
+                0,
+                json.dumps(
+                    {
+                        "headRefOid": expected_head,
+                        "headRefName": "powdrr/worker-branch",
+                        "headRepository": {
+                            "id": "R_kgDOVNdwkg",
+                            "name": "powdrr-gaterr",
+                            "nameWithOwner": "",
+                        },
+                        "headRepositoryOwner": {"login": "powdrr-io"},
+                        "baseRefName": "main",
+                        "title": "Refresh worker validation baseline",
+                    }
+                ),
+                "",
+            )
+
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str] | tuple[str, ...], **_kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        command = list(arguments)
+        commands.append(command)
+        stdout = expected_head if "rev-parse" in command else ""
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    monkeypatch.setattr(github_issue_queue.subprocess, "run", run)
+    monkeypatch.setattr(
+        github_issue_queue.tempfile,
+        "mkdtemp",
+        lambda **_kwargs: str(tmp_path / "private-pr-refresh"),
+    )
+    monkeypatch.setattr(
+        github_issue_queue,
+        "_read_repository_validation_inventory",
+        lambda _root: {"checks": [], "digest": "fresh", "input_paths": ()},
+    )
+
+    refreshed_head = github_issue_queue._refresh_pull_request_validation_baseline(
+        client=PrivateRepositoryClient(),  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        pull_request_number=1047,
+        expected_head=expected_head,
+    )
+
+    assert refreshed_head == expected_head
+    assert any("headRepositoryOwner" in field for field in requested_fields)
+    assert any("refs/pull/1047/head" in " ".join(command) for command in commands)
+
+
 def test_observed_passing_draft_pr_is_marked_ready_for_review() -> None:
     class DraftClient(FakeIssueClient):
         is_draft = True

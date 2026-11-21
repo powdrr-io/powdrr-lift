@@ -119,6 +119,7 @@ class ChangeRequiredTestCase:
     expected_outcome: str | None = None
     selectors: list[str] = field(default_factory=list)
     story_refs: list[dict[str, Any]] = field(default_factory=list)
+    requirement_bindings: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,6 +252,14 @@ def _parse_verification(raw_verification: object | None) -> ChangeVerification:
             story_refs=[
                 ref.to_data()
                 for ref in parse_story_case_refs(case.get("story_refs", []))
+            ],
+            requirement_bindings=[
+                {
+                    "requirement_id": str(binding.get("requirement_id", "")),
+                    "requirement_digest": str(binding.get("requirement_digest", "")),
+                }
+                for raw_binding in _ensure_sequence(case.get("requirement_bindings"))
+                for binding in (_ensure_mapping(raw_binding),)
             ],
         )
         for raw_case in _ensure_sequence(data.get("required_test_cases"))

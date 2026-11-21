@@ -74,6 +74,12 @@ def test_changelog_verification_tracks_test_cases_and_command_results() -> None:
                     "selectors": [
                         "tests/test_ci_preservation.py::test_ci_remains_configured"
                     ],
+                    "requirement_bindings": [
+                        {
+                            "requirement_id": "req-01",
+                            "requirement_digest": "sha256:" + "a" * 64,
+                        }
+                    ],
                 }
             ],
             "validation_runs": [
@@ -93,6 +99,12 @@ def test_changelog_verification_tracks_test_cases_and_command_results() -> None:
     assert parsed.verification.required_test_cases[0].scenario == (
         "Load the workflow and inspect its triggers."
     )
+    assert parsed.verification.required_test_cases[0].requirement_bindings == [
+        {
+            "requirement_id": "req-01",
+            "requirement_digest": "sha256:" + "a" * 64,
+        }
+    ]
     assert parsed.verification.validation_runs[0].command == [
         "python",
         "-m",
@@ -106,6 +118,30 @@ def test_changelog_verification_tracks_test_cases_and_command_results() -> None:
         available_files={"tests/test_ci_preservation.py"},
     )
     assert issues == []
+
+    invalid_bindings = yaml.safe_load(yaml.safe_dump(document))
+    invalid_bindings["verification"]["required_test_cases"][0][
+        "requirement_bindings"
+    ] = [
+        {
+            "requirement_id": "req-01",
+            "requirement_digest": "not-a-digest",
+        },
+        {
+            "requirement_id": "req-01",
+            "requirement_digest": "sha256:" + "b" * 64,
+        },
+    ]
+    issues = []
+    validate_v2_verification(
+        invalid_bindings,
+        issues,
+        available_files={"tests/test_ci_preservation.py"},
+    )
+    assert {issue.code for issue in issues} == {
+        "required_test_case_requirement_id_invalid",
+        "required_test_case_requirement_digest_invalid",
+    }
 
     issues = []
     validate_v2_verification(document, issues, available_files=set())

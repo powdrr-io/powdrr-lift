@@ -7,42 +7,26 @@ job has completed.
 
 ## Caller workflow
 
-The verifier job uploads an artifact named `powdrr-verification-receipt-input`
-containing one `receipt-input.json` file. The file has this shape:
+The verifier job uploads the artifact directory emitted by
+`VerificationEvidenceRunner` as `powdrr-verification-evidence`. It contains a
+`verification-run.json` index and one evidence directory per stable obligation
+ID. Each index entry points to that obligation's persisted `evidence.json`.
+The index records the candidate tree and the serialized obligations so the
+publisher does not need a hand-authored receipt input file.
 
-```json
-{
-  "schema_version": "verification-receipt-input-v1",
-  "candidate_tree": "<candidate-tree-fingerprint>",
-  "obligations": [],
-  "evidence": [],
-  "requirement_bindings": {
-    "<obligation-id>": [
-      {
-        "requirement_id": "<stable-requirement-id>",
-        "requirement_digest": "sha256:<typed-requirement-digest>"
-      }
-    ]
-  },
-  "evidence_artifact_refs": {
-    "<obligation-id>": "<artifact-reference-to-evidence.json>"
-  }
-}
-```
+The target repository commits its Structrr diff artifacts at
+`docs/structrr/diffs/**/structrr-diff.yaml`. Each
+`verification.required_test_cases` entry may contain selectors and explicit
+`requirement_bindings` with stable requirement IDs and typed digests. The
+publisher matches each selector to exactly one verifier obligation by exact
+string equality. It publishes a receipt only when every selector bound to that
+requirement has one matching passing evidence record. Missing, ambiguous, and
+failed evidence is omitted, allowing planning to use semantic coverage.
+Malformed identities, digest conflicts, and evidence for a different pinned
+commit or candidate tree fail publication.
 
-`obligations` and `evidence` are the corresponding records emitted by
-`VerificationEvidenceRunner`. Requirement bindings come from the pinned
-compiled execution plan. Powdrr issue-worker PR artifacts persist each planned
-test case's stable ID, selectors, and exact requirement ID/digest pairs in
-`docs/structrr/diffs/*/*/structrr-diff.yaml` under
-`verification.required_test_cases`. A verifier integration joins each observed
-obligation to that record by its stable test-case ID when building this input.
-The producer does not infer a requirement from a selector, test content, or
-story reference. One verifier result may be bound to multiple requirements, but
-a requirement may appear only once in the input.
-
-After uploading the input, a downstream job calls the reusable workflow with a
-full Powdrr commit SHA:
+After uploading verifier evidence, a downstream job calls the reusable workflow
+with a full Powdrr commit SHA:
 
 ```yaml
   publish-receipts:
@@ -54,9 +38,8 @@ full Powdrr commit SHA:
 
 The caller must grant the workflow `actions: read` and `contents: read`. The
 reusable workflow checks out the caller at `github.sha`, verifies that checkout
-HEAD equals the pinned commit, validates each evidence record against its
-explicit obligation and candidate tree, and publishes
-`powdrr-requirement-execution-receipts`. Failed, missing, ambiguous, or
-mismatched evidence makes the producer fail and no receipt artifact is
-published. Powdrr planning only consumes the artifact from a completed
-successful GitHub Actions run on the exact pinned commit.
+HEAD equals the pin, downloads the verifier evidence artifact, checks the
+candidate tree and exact requirement bindings, and publishes
+`powdrr-requirement-execution-receipts`. Powdrr planning consumes the receipt
+artifact only from a completed successful GitHub Actions run on the exact
+pinned commit.

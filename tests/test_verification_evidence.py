@@ -85,6 +85,20 @@ def test_evidence_runner_persists_identity_and_output_artifacts(tmp_path: Path) 
     assert evidence[0].artifact_refs
     record = Path(evidence[0].artifact_refs[0]).parent / "evidence.json"
     assert json.loads(record.read_text(encoding="utf-8"))["status"] == "passed"
+    run_index = json.loads(
+        (tmp_path / "artifacts" / "verification-run.json").read_text(encoding="utf-8")
+    )
+    assert run_index["schema_version"] == "verification-evidence-run-v1"
+    assert run_index["candidate_tree"] == "sha256:candidate"
+    assert run_index["obligations"] == [_obligation().to_data()]
+    assert run_index["evidence_files"] == [
+        {
+            "obligation_id": evidence[0].obligation_id,
+            "path": (
+                f"{evidence[0].obligation_id.removeprefix('sha256:')}/evidence.json"
+            ),
+        }
+    ]
     assert [item["event"] for item in progress] == [
         "verification_started",
         "verification_finished",

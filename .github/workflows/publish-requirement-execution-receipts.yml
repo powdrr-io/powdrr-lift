@@ -7,10 +7,10 @@ on:
         description: Full Git commit SHA of powdrr-lift containing the producer.
         required: true
         type: string
-      input_artifact_name:
+      verification_artifact_name:
         description: Artifact uploaded by the verifier job in this workflow run.
         required: false
-        default: powdrr-verification-receipt-input
+        default: powdrr-verification-evidence
         type: string
 
 permissions:
@@ -31,13 +31,13 @@ jobs:
         with:
           repository: powdrr-io/powdrr-lift
           ref: ${{ inputs.powdrr_ref }}
-          path: .powdrr-lift
+          path: ${{ runner.temp }}/powdrr-lift
 
-      - name: Download verifier evidence input
+      - name: Download verifier evidence
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.input_artifact_name }}
-          path: .powdrr-verification-receipt-input
+          name: ${{ inputs.verification_artifact_name }}
+          path: ${{ runner.temp }}/powdrr-verification-evidence
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -50,15 +50,15 @@ jobs:
           version: latest
 
       - name: Install pinned Powdrr producer
-        run: uv sync --project .powdrr-lift --frozen --no-dev
+        run: uv sync --project "$RUNNER_TEMP/powdrr-lift" --frozen --no-dev
 
       - name: Produce exact-commit receipts
         env:
-          PYTHONPATH: .powdrr-lift/src:.powdrr-lift/packages/agent/src:.powdrr-lift/packages/contracts/src:.powdrr-lift/packages/local/src:.powdrr-lift/packages/service/src
+          PYTHONPATH: ${{ runner.temp }}/powdrr-lift/src:${{ runner.temp }}/powdrr-lift/packages/agent/src:${{ runner.temp }}/powdrr-lift/packages/contracts/src:${{ runner.temp }}/powdrr-lift/packages/local/src:${{ runner.temp }}/powdrr-lift/packages/service/src
         run: >-
-          uv run --project .powdrr-lift --frozen powdrr-lift
+          uv run --project "$RUNNER_TEMP/powdrr-lift" --frozen powdrr-lift
           publish-execution-receipts
-          --input .powdrr-verification-receipt-input/receipt-input.json
+          --verification-artifact-dir "$RUNNER_TEMP/powdrr-verification-evidence"
           --output .powdrr-receipt-output
           --pinned-commit "$GITHUB_SHA"
           --run-id "$GITHUB_RUN_ID"

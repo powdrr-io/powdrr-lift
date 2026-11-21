@@ -1115,8 +1115,21 @@ class GitHubIssueClient:
     def _invoke(
         self, arguments: Sequence[str], *, check: bool = True
     ) -> subprocess.CompletedProcess[str]:
+        command = [self.executable, *arguments]
+        if arguments and arguments[0] == "pr":
+            repo_flag_indexes = [
+                index
+                for index, value in enumerate(command)
+                if value in {"--repo", "-R"}
+            ]
+            if any(index + 1 >= len(command) for index in repo_flag_indexes):
+                raise GitHubIssueQueueError("gh pr repository flag needs a value")
+            for index in repo_flag_indexes:
+                command[index + 1] = self.repository
+            if not repo_flag_indexes:
+                command.extend(("--repo", self.repository))
         result = self._run(
-            [self.executable, *arguments],
+            command,
             capture_output=True,
             text=True,
             check=False,
@@ -1507,6 +1520,50 @@ def run_worker_once(
             pointer = parse_issue_pointer(issue.body)
             if pointer is None:
                 continue
+            published_pr_url = _latest_published_pr_url_from_issue_comments(
+                client.list_comments(issue.number), issue_number=issue.number
+            )
+            if published_pr_url is not None:
+                pr_number = _same_repository_pull_request_number(
+                    published_pr_url, client.repository
+                )
+                pull_request = (
+                    client.pull_request(pr_number) if pr_number is not None else {}
+                )
+                if pr_number is None:
+                    status = "blocked"
+                    published_pr_detail = (
+                        "A published PR marker exists, but its URL does not point "
+                        "to this repository; implementation was not rerun."
+                    )
+                elif str(pull_request.get("state", "")).lower() == "open":
+                    status = "awaiting_review"
+                    published_pr_detail = (
+                        f"Existing published PR #{pr_number} is still open; "
+                        "implementation was not rerun."
+                    )
+                else:
+                    status = "blocked"
+                    published_pr_detail = (
+                        f"Published PR #{pr_number} is no longer open, but the "
+                        "issue remains open. Review the PR and issue state before "
+                        "retrying implementation."
+                    )
+                client.update_issue(
+                    issue,
+                    labels=_replace_queue_status(issue.labels, status),
+                )
+                client.add_comment(
+                    issue,
+                    "Powdrr reconciliation: "
+                    f"{published_pr_detail}\n\n{published_pr_url}",
+                )
+                return WorkerReport(
+                    status,
+                    issue.number,
+                    pointer["item_id"],
+                    published_pr_detail,
+                )
             plan_key = (
                 pointer["plan_id"],
                 pointer["plan_path"],
@@ -1933,16 +1990,45 @@ def run_worker_once(
                         )
                     outcome = ci_outcome
             else:
-                status = "blocked"
-                outcome = "blocked"
-                detail = detail or "Task runner returned a non-success exit code."
+                published_pr_url = _latest_published_pr_url_from_issue_comments(
+                    client.list_comments(issue.number), issue_number=issue.number
+                )
+                published_pr_number = (
+                    _same_repository_pull_request_number(
+                        published_pr_url, client.repository
+                    )
+                    if published_pr_url is not None
+                    else None
+                )
+                if published_pr_number is not None:
+                    status = "awaiting_review"
+                    outcome = "awaiting_review"
+                    stage = "pr_finalization"
+                    detail = (
+                        f"PR #{published_pr_number} was published at "
+                        f"{published_pr_url}, but post-publication finalization "
+                        "failed: "
+                        f"{detail or 'task runner returned a non-success exit code.'}"
+                    )
+                    note = (
+                        "Powdrr published a PR, but post-publication finalization "
+                        "failed. The issue is recorded as awaiting review and the "
+                        "implementation will not be rerun automatically.\n\n"
+                        f"{detail}"
+                    )
+                else:
+                    status = "blocked"
+                    outcome = "blocked"
+                    stage = "implementation"
+                    detail = detail or "Task runner returned a non-success exit code."
+                    note = f"Powdrr execution failed during implementation.\n\n{detail}"
                 failure = TaskExecutionResult(
                     plan_id=plan.plan_id,
                     item_id=item.item_id,
                     workflow_id=item.workflow_id,
                     issue_number=issue.number,
                     worker_id=worker_id,
-                    stage="implementation",
+                    stage=stage,
                     outcome="failed",
                     detail=detail,
                     runner_exit_code=(
@@ -1950,10 +2036,9 @@ def run_worker_once(
                     ),
                 )
                 failure_path = _write_task_execution_result(root, failure)
-                note = (
-                    "Powdrr execution failed during implementation.\n\n"
-                    f"{detail}\n\n"
-                    f"Durable diagnostic: `{failure_path.relative_to(root).as_posix()}`"
+                note += (
+                    "\n\nDurable diagnostic: "
+                    f"`{failure_path.relative_to(root).as_posix()}`"
                 )
             issue = client.get_issue(issue.number)
             client.update_issue(

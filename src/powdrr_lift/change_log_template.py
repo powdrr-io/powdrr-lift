@@ -465,31 +465,34 @@ def _collect_file_spans(
         "--",
         path,
     )
-    span_ranges: list[tuple[int, int]] = []
+    return diff_hunk_spans(diff_output)
+
+
+def diff_hunk_spans(diff_output: str) -> list[tuple[int, int]]:
+    """Return the changed line spans from a zero-context unified diff.
+
+    Added and modified lines use new-file coordinates. A deletion-only hunk
+    has no new-file lines, so its old-file coordinates identify the change.
+    Changelog generation and validation must use this same rule.
+    """
+    spans: list[tuple[int, int]] = []
     hunk_header_pattern = re.compile(
         r"^@@ -(?P<old_start>\d+)(?:,(?P<old_count>\d+))? "
         r"\+(?P<new_start>\d+)(?:,(?P<new_count>\d+))? @@"
     )
-
     for line in diff_output.splitlines():
         match = hunk_header_pattern.match(line)
-        if not match:
+        if match is None:
             continue
-
         old_start = int(match.group("old_start"))
         old_count = int(match.group("old_count") or "1")
         new_start = int(match.group("new_start"))
         new_count = int(match.group("new_count") or "1")
-
         if new_count > 0:
-            span_ranges.append((new_start, new_start + new_count - 1))
+            spans.append((new_start, new_start + new_count - 1))
         elif old_count > 0:
-            span_ranges.append((old_start, old_start + old_count - 1))
-
-    if not span_ranges:
-        return []
-
-    return span_ranges
+            spans.append((old_start, old_start + old_count - 1))
+    return spans
 
 
 def _resolve_repo_root(repo_root: str | Path | None) -> Path:

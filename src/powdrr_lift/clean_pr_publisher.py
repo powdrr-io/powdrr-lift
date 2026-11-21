@@ -16,6 +16,7 @@ import yaml
 from powdrr_service.changelog import parse_change_log
 from powdrr_service.changelog.template import is_structured_document_path
 
+from powdrr_lift.change_log_template import diff_hunk_spans
 from powdrr_lift.errors import PowdrrExecutionError
 
 _STANDARD_PR_DESCRIPTION_HEADINGS = (
@@ -874,23 +875,17 @@ def _ensure_pull_request_changelog(
             raise PowdrrExecutionError(
                 f"Could not inspect PR diff for changelog path {path!r}: {detail}"
             )
-        spans = [
-            (int(hunk.group(1)), int(hunk.group(2) or "1"))
-            for line in diff.stdout.splitlines()
-            if (hunk := re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line))
-        ]
         # Binary files have no text hunk and are intentionally omitted from
-        # changelog file spans by the shared validator as well.
-        for start_line, line_count in spans:
-            if line_count == 0:
-                continue
+        # changelog file spans by the shared validator as well. Deletion-only
+        # hunks use their old-file coordinates, as required by that validator.
+        for start_line, end_line in diff_hunk_spans(diff.stdout):
             file_type = "modified" if existed else "added"
             span = {
                 "start_line": start_line,
-                "end_line": start_line + line_count - 1,
+                "end_line": end_line,
             }
             previous_record = previous_file_records.get(
-                (path, file_type, (start_line, start_line + line_count - 1))
+                (path, file_type, (start_line, end_line))
             )
             files.append(
                 {

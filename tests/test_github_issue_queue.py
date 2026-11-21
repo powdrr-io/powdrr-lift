@@ -253,6 +253,83 @@ def test_abandoned_publication_with_multiple_prs_stays_unresolved(
     assert QUEUE_LABELS["blocked"] in client.get_issue(18).labels
 
 
+def test_worker_reconciles_published_pr_before_claiming_issue(
+    tmp_path: Path,
+) -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    pull_request_url = "https://github.com/example/project/pull/77"
+    client.add_comment(
+        issue,
+        f"Powdrr PR for issue #{issue.number}: {pull_request_url}",
+    )
+    client.pull_requests[77] = {"state": "open", "merged": False}
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-reconciliation",
+        run_task=lambda *_args: pytest.fail(
+            "an existing published PR must prevent implementation from rerunning"
+        ),
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    updated = client.get_issue(issue.number)
+    assert report.outcome == "awaiting_review", report
+    assert report.detail and "implementation was not rerun" in report.detail
+    assert QUEUE_LABELS["awaiting_review"] in updated.labels
+    assert QUEUE_LABELS["ready"] not in updated.labels
+    assert client.pull_request_reads[77] == 1
+
+
+def test_worker_records_post_publication_failure_without_blocking_or_retrying(
+    tmp_path: Path,
+) -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    pull_request_url = "https://github.com/example/project/pull/78"
+    workflow_path = tmp_path / "docs/workflows/base"
+    workflow_path.mkdir(parents=True)
+
+    def fail_during_finalization(*_args: Any) -> int:
+        client.add_comment(
+            issue,
+            f"Powdrr PR for issue #{issue.number}: {pull_request_url}",
+        )
+        raise RuntimeError("generated changelog omitted a deletion hunk")
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-finalization-failure",
+        run_task=fail_during_finalization,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    updated = client.get_issue(issue.number)
+    assert report.outcome == "awaiting_review", report
+    assert report.failure_record is not None
+    assert QUEUE_LABELS["awaiting_review"] in updated.labels
+    assert QUEUE_LABELS["blocked"] not in updated.labels
+    failure = json.loads(Path(report.failure_record).read_text(encoding="utf-8"))
+    assert failure["stage"] == "pr_finalization"
+    assert "PR #78 was published" in failure["detail"]
+    assert "deletion hunk" in failure["detail"]
+
+
 def test_worker_executes_independent_items_concurrently(tmp_path: Path) -> None:
     first_item = PlannedWorkItem(
         "first",
@@ -715,6 +792,32 @@ class FakeIssueClient:
                 ["gh", *arguments], 0, json.dumps(self.pull_request_files), ""
             )
         return subprocess.CompletedProcess(["gh", *arguments], 1, "", "unexpected")
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["pr", "view", "1047", "--json", "headRefOid"],
+        ["pr", "view", "1047", "--repo", "powdrr-io/powdrr-lift"],
+        ["pr", "view", "1047", "-R", "powdrr-io/powdrr-lift"],
+    ],
+)
+def test_github_issue_client_scopes_pr_commands_to_configured_repository(
+    arguments: list[str],
+) -> None:
+    commands: list[list[str]] = []
+
+    def run(command: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, "{}", "")
+
+    client = GitHubIssueClient("powdrr-io/powdrr-gaterr", run=run)
+
+    client._invoke(arguments, check=False)
+
+    assert commands[0][-2] in {"--repo", "-R"}
+    assert commands[0][-1] == "powdrr-io/powdrr-gaterr"
+    assert commands[0][0] == "gh"
 
 
 def _closed_issue_worktree(tmp_path: Path, *, dirty: bool = False) -> tuple[Path, Path]:

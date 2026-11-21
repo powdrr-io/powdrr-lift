@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 import yaml
 from powdrr_service.planning.contracts import PlanningContractError
-from powdrr_service.planning.questions import SourceExcerpt
+from powdrr_service.planning.questions import (
+    MAX_TEST_COVERAGE_BATCH_INPUT_CHARS,
+    SourceExcerpt,
+    batch_question_requests,
+)
 from powdrr_service.planning.test_coverage import (
     build_test_coverage_request,
     exact_source_test_coverage_answer,
@@ -151,6 +155,39 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     assert behavior["faithfulness_ref"]["fingerprint"].startswith("sha256:")
     assert behavior["when"] == planned["required_test_cases"][0]["scenario"]
     assert behavior["then"] == planned["required_test_cases"][0]["expected_outcome"]
+
+
+def test_test_coverage_questions_batch_with_their_own_input_bound() -> None:
+    requests = tuple(
+        build_test_coverage_request(
+            {
+                "id": f"item-{index}",
+                "acceptance_criteria": [f"Criterion for item {index}."],
+            },
+            source_excerpts=(
+                SourceExcerpt(f"anchor-{index}", "The source defines the behavior."),
+            ),
+            requirements=(
+                {
+                    "id": f"req-{index}",
+                    "statement": "behavior " * 700,
+                    "source_refs": [f"anchor-{index}"],
+                },
+            ),
+        )
+        for index in range(2)
+    )
+
+    batches = batch_question_requests(requests)
+
+    assert MAX_TEST_COVERAGE_BATCH_INPUT_CHARS == 48_000
+    assert len(batches) == 1
+    batch = batches[0]
+    assert len(batch.batch_members) == 2
+    assert batch.max_input_chars == MAX_TEST_COVERAGE_BATCH_INPUT_CHARS
+    assert batch.parse_answer(
+        {"answers": [request.valid_example for request in requests]}
+    ) == {request.question.question_id: request.valid_example for request in requests}
 
 
 def test_test_design_revalidates_nested_source_logic_against_pinned_excerpts() -> None:

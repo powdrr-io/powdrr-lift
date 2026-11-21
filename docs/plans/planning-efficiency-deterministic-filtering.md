@@ -728,6 +728,18 @@ is deterministic benchmark evidence only. Live-provider behavior still needs
 evaluation because prior live responses have omitted requested proposal groups;
 the call reduction does not establish semantic completeness.
 
+### Paired test-design questions (2026-11-21)
+
+Independent PR-item test-design questions now batch in pairs with a dedicated
+48,000-character combined input limit; each member retains its existing
+24,000-character limit and answer parser. If a batched member fails, its
+checkpoint records the parent batch ID, and replay asks that member separately
+while still batching unaffected questions. On the deterministic large profile,
+test-design calls fell from 50 to 25 and total provider calls fell from 241 to
+216 (10.4%). All 500 source obligations and 150 work units still matched the
+fixture oracle, with no validation retries. This synthetic result measures call
+reduction only; live-provider completeness remains unmeasured.
+
 ## Cross-cutting test requirements
 
 - Use mocked nontrivial provider responses. Do not use live-model calls as the only proof that a contract works.

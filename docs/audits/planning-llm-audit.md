@@ -875,6 +875,16 @@ not evidence that live model responses preserve all requested work-unit groups.
 Live-provider semantic completeness remains an evaluation gap, especially
 because earlier live responses omitted proposal groups.
 
+Test-design batching update: independent `plan_test_coverage` questions now
+batch in pairs under a 48,000-character combined input limit. Each member keeps
+its original 24,000-character limit and schema. Checkpoints preserve the parent
+batch ID, and replay separates failed members before issuing another request.
+The deterministic large profile reduced test-design calls from 50 to 25 and
+total calls from 241 to 216, with fixture source and sizing checks passing. This
+synthetic call-count improvement does not establish live-model semantic
+completeness for typed behavior scenarios; that still requires a reviewed live
+evaluation.
+
 The default planning route has thirteen business question families plus three
 wrapper families. Nine dormant builders and eight older direct completion sites
 are catalogued separately to avoid inflating normal counts. A future refactor

@@ -153,6 +153,10 @@ def test_work_unit_proposal_batching_reduces_large_profile_call_count() -> None:
     assert proposal_metrics["questions"] == 10
     assert proposal_metrics["api_calls"] == 5
     assert report["max_batch_members_by_question_kind"]["propose_work_units"] == 2
+    coverage_metrics = report["by_question_kind"]["plan_test_coverage"]
+    assert coverage_metrics["questions"] == profile.plan_items
+    assert coverage_metrics["api_calls"] == 3
+    assert report["max_batch_members_by_question_kind"]["plan_test_coverage"] == 2
     assert report["source_obligation_evaluation"]["status"] == "matched"
 
 

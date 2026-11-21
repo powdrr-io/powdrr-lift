@@ -22,6 +22,8 @@ MAX_QUESTION_INPUT_CHARS = 24_000
 MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS = 32_000
 MAX_WORK_UNIT_BATCH_INPUT_CHARS = 32_000
 MAX_TEST_COVERAGE_BATCH_INPUT_CHARS = 48_000
+MAX_STRUCTURAL_CHANGE_BATCH_INPUT_CHARS = 48_000
+MAX_STRUCTURAL_ENUMERATION_BATCH_INPUT_CHARS = 48_000
 MAX_SOURCE_BLOCK_CHARS = 8_000
 MAX_QUESTION_ANSWER_CHARS = 4_000
 MAX_WORK_UNIT_ANSWER_CHARS = 6_144
@@ -31,6 +33,8 @@ __all__ = [
     "MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS",
     "MAX_WORK_UNIT_BATCH_INPUT_CHARS",
     "MAX_TEST_COVERAGE_BATCH_INPUT_CHARS",
+    "MAX_STRUCTURAL_CHANGE_BATCH_INPUT_CHARS",
+    "MAX_STRUCTURAL_ENUMERATION_BATCH_INPUT_CHARS",
     "MAX_SOURCE_BLOCK_CHARS",
     "MAX_QUESTION_ANSWER_CHARS",
     "MAX_SEMANTIC_CORRECTIONS",
@@ -231,7 +235,12 @@ def batch_question_requests(
         request.validate()
         batch_limit = max_batch_size or (
             6
-            if request.question.kind == "extract_requirements"
+            if request.question.kind
+            in {
+                "extract_requirements",
+                "describe_structural_change",
+                "enumerate_structural_subjects",
+            }
             else 2
             if request.question.kind in {"propose_work_units", "plan_test_coverage"}
             else 4
@@ -401,6 +410,10 @@ def _build_question_batch(
             if requests[0].question.kind == "propose_work_units"
             else MAX_TEST_COVERAGE_BATCH_INPUT_CHARS
             if requests[0].question.kind == "plan_test_coverage"
+            else MAX_STRUCTURAL_CHANGE_BATCH_INPUT_CHARS
+            if requests[0].question.kind == "describe_structural_change"
+            else MAX_STRUCTURAL_ENUMERATION_BATCH_INPUT_CHARS
+            if requests[0].question.kind == "enumerate_structural_subjects"
             else MAX_QUESTION_INPUT_CHARS
         ),
     )

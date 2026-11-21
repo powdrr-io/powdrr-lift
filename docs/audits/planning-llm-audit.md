@@ -885,6 +885,22 @@ synthetic call-count improvement does not establish live-model semantic
 completeness for typed behavior scenarios; that still requires a reviewed live
 evaluation.
 
+Structrr description batching update: up to six independent
+`describe_structural_change` questions are sent together under a 48,000-character
+combined limit; each member remains individually bounded to 24,000 characters
+and is validated against its original schema. Checkpointed parent batch IDs
+allow failed members to replay singly. The deterministic stress profile
+reduced structural-description calls from 545 to 404 and total calls from 564
+to 423, while validating all 2,151 question members and compiling successfully.
+These synthetic measurements do not establish live-provider semantic
+completeness for structural decisions.
+
+Structural-subject enumeration also batches up to six questions under its own
+48,000-character combined limit. The large deterministic profile reduced
+enumeration calls from 34 to 12 across 50 items and total calls from 216 to 194.
+The Structrr-stress profile reduced enumeration from three calls to one, with
+all fixture checks passing. Live-provider completeness remains unmeasured.
+
 The default planning route has thirteen business question families plus three
 wrapper families. Nine dormant builders and eight older direct completion sites
 are catalogued separately to avoid inflating normal counts. A future refactor

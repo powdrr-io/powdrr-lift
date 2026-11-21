@@ -1261,7 +1261,12 @@ def run_profile(
     batch_limits = {
         kind: (
             6
-            if kind == "extract_requirements"
+            if kind
+            in {
+                "extract_requirements",
+                "describe_structural_change",
+                "enumerate_structural_subjects",
+            }
             else 2
             if kind in {"propose_work_units", "plan_test_coverage"}
             else 4

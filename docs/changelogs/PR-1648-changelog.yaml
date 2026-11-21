@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1647
+change_id: 1648
 title: Publish pinned planner execution receipts
 intent:
   problem: Planning can consume exact-commit execution receipts, but no supported producer joined observed verifier evidence to planner requirement bindings and published the artifact.

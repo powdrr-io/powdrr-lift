@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1656
+change_id: 1657
 title: Report live planning benchmark usage and cost
 intent:
   problem: The planning scale benchmark counts requests but cannot report provider-call latency, provider-reported usage, or cost coverage accurately for native batches.

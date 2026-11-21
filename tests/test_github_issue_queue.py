@@ -592,6 +592,7 @@ def _write_process_workflow(
 class FakeIssueClient:
     def __init__(self, issues: tuple[QueueIssue, ...] = ()) -> None:
         self.repository = "example/project"
+        self.branch = "main"
         self.issues = list(issues)
         self.issue_list_reads: dict[tuple[tuple[str, ...], str], int] = {}
         self.comments: list[tuple[int, str]] = []
@@ -624,6 +625,9 @@ class FakeIssueClient:
 
     def default_branch_required_checks(self) -> tuple[str, ...] | None:
         return self.default_branch_checks
+
+    def default_branch(self) -> str:
+        return self.branch
 
     def list_issues(
         self, *, labels: tuple[str, ...] = (), state: str = "all"
@@ -884,18 +888,21 @@ def test_dependency_result_is_checked_once_per_plan_node(
 
 
 @pytest.mark.parametrize(
-    ("marker_issue", "merged", "pull_request_body", "expected"),
+    ("marker_issue", "merged", "identity_matches", "base", "expected"),
     [
-        (100, True, "Closes #100", True),
-        (100, False, "Closes #100", False),
-        (100, True, "Closes #999", False),
-        (101, True, "Closes #100", False),
+        (100, True, True, "main", True),
+        (100, True, False, "main", False),
+        (100, True, None, "main", False),
+        (100, True, True, "release", False),
+        (100, False, True, "main", False),
+        (101, True, True, "main", False),
     ],
 )
 def test_dependency_recovers_a_merged_published_pr_without_task_checkpoint(
     marker_issue: int,
     merged: bool,
-    pull_request_body: str,
+    identity_matches: bool | None,
+    base: str,
     expected: bool,
 ) -> None:
     client = FakeIssueClient()
@@ -920,10 +927,32 @@ def test_dependency_recovers_a_merged_published_pr_without_task_checkpoint(
             "https://github.com/example/project/pull/123",
         )
     )
+    from powdrr_service.planning.repair import item_input_contract_digest
+
+    item = plan().items[0]
+    identity = {
+        "schema": "powdrr-work-item-publication-v1",
+        "repository": client.repository,
+        "issue_number": 100,
+        "plan_id": "feature-v1",
+        "item_id": "base",
+        "input_contract_digest": item_input_contract_digest(item, plan().planning),
+        "purpose": "implementation",
+    }
+    if identity_matches is False:
+        identity["input_contract_digest"] = "sha256:" + "0" * 64
+    publication_marker = (
+        ""
+        if identity_matches is None
+        else "<!-- powdrr-work-item-publication:v1 "
+        + json.dumps(identity, sort_keys=True, separators=(",", ":"))
+        + " -->"
+    )
     client.pull_requests[123] = {
         "merged": merged,
         "merge_commit_sha": "d" * 40 if merged else None,
-        "body": pull_request_body,
+        "base": {"ref": base},
+        "body": f"Closes #100\n\n{publication_marker}",
     }
 
     fulfilled = github_issue_queue._dependency_is_fulfilled(
@@ -960,10 +989,29 @@ def test_worker_promotes_next_item_from_merged_publication_without_task_checkpoi
             "https://github.com/example/project/pull/123",
         )
     )
+    from powdrr_service.planning.repair import item_input_contract_digest
+
+    identity = {
+        "schema": "powdrr-work-item-publication-v1",
+        "repository": client.repository,
+        "issue_number": base_issue.number,
+        "plan_id": "feature-v1",
+        "item_id": "base",
+        "input_contract_digest": item_input_contract_digest(
+            plan().items[0], plan().planning
+        ),
+        "purpose": "implementation",
+    }
     client.pull_requests[123] = {
         "merged": True,
         "merge_commit_sha": "d" * 40,
-        "body": f"Closes #{base_issue.number}",
+        "base": {"ref": "main"},
+        "body": (
+            f"Closes #{base_issue.number}\n\n"
+            "<!-- powdrr-work-item-publication:v1 "
+            + json.dumps(identity, sort_keys=True, separators=(",", ":"))
+            + " -->"
+        ),
     }
     executed: list[str] = []
 

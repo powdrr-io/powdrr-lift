@@ -409,6 +409,7 @@ class WorkflowTaskAgentConfig:
     task_checkpoint_callback: Callable[[str, str, Any, str | None], None] | None = None
     github_issue_number: int | None = None
     github_repository: str | None = None
+    work_item_identity: Mapping[str, Any] | None = None
     claim_guard: Callable[[], None] | None = None
 
 
@@ -2989,6 +2990,81 @@ def _append_issue_reference_to_pr_body(
     return WorkflowAction(kind=action.kind, tool=action.tool, parameters=parameters)
 
 
+def _append_work_item_identity_to_pr_body(
+    action: WorkflowAction, *, task_input_state: Mapping[str, Any]
+) -> WorkflowAction:
+    """Carry the worker-owned accepted contract identity into its PR."""
+    if action.tool != GH_TOOL or action.parameters.get("operation") not in {
+        "pr_create",
+        "pr_publish_clean",
+    }:
+        return action
+    proposed = task_input_state.get("proposed_pr_context")
+    identity = (
+        proposed.get("work_item_identity") if isinstance(proposed, Mapping) else None
+    )
+    required = {
+        "schema",
+        "repository",
+        "issue_number",
+        "plan_id",
+        "item_id",
+        "input_contract_digest",
+        "purpose",
+    }
+    if (
+        not isinstance(identity, Mapping)
+        or not required.issubset(identity)
+        or identity.get("schema") != "powdrr-work-item-publication-v1"
+        or not isinstance(identity.get("repository"), str)
+        or not isinstance(identity.get("issue_number"), int)
+        or not isinstance(identity.get("plan_id"), str)
+        or not isinstance(identity.get("item_id"), str)
+        or not isinstance(identity.get("input_contract_digest"), str)
+        or not isinstance(identity.get("purpose"), str)
+    ):
+        return action
+    marker = (
+        "<!-- powdrr-work-item-publication:v1 "
+        + json.dumps(
+            dict(identity), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        + " -->"
+    )
+    parameters = dict(action.parameters)
+    if parameters.get("operation") == "pr_publish_clean":
+        raw_context = parameters.get("workflow_context")
+        context = dict(raw_context) if isinstance(raw_context, Mapping) else {}
+        sections_key = next(
+            (
+                key
+                for key in ("pr-description-sections", "pr_description_sections")
+                if key in context
+            ),
+            None,
+        )
+        raw_sections = context.get(sections_key) if sections_key else None
+        if not isinstance(raw_sections, Mapping):
+            return action
+        sections = dict(raw_sections)
+        objective = sections.get("objective")
+        if (
+            not isinstance(objective, str)
+            or "powdrr-work-item-publication:v1" in objective
+        ):
+            return action
+        sections["objective"] = f"{objective.rstrip()}\n\n{marker}"
+        context[sections_key] = sections
+        parameters["workflow_context"] = context
+    else:
+        body_value = parameters.get("body")
+        body = body_value if isinstance(body_value, str) else ""
+        if "powdrr-work-item-publication:v1" in body:
+            return action
+        parameters["body"] = f"{body.rstrip()}\n\n{marker}".lstrip()
+    return WorkflowAction(kind=action.kind, tool=action.tool, parameters=parameters)
+
+
 def _issue_worker_pr_changelog(
     *,
     repo_root: Path,
@@ -4105,6 +4181,9 @@ class _TaskWorkflowExecutionStrategy:
                     else None
                 )
             ),
+        )
+        action = _append_work_item_identity_to_pr_body(
+            action, task_input_state=self.task.input_state
         )
         action = _append_plan_repair_metadata_to_pr_body(
             action,
@@ -7493,6 +7572,16 @@ def run_workflow_task(
                 return 1
             print(_no_ready_agent_task_diagnostic(workflow), file=stderr)
             return 1
+
+        if config.work_item_identity is not None and isinstance(
+            task.input_state, Mapping
+        ):
+            input_state = dict(task.input_state)
+            proposed = input_state.get("proposed_pr_context")
+            proposed = dict(proposed) if isinstance(proposed, Mapping) else {}
+            proposed["work_item_identity"] = dict(config.work_item_identity)
+            input_state["proposed_pr_context"] = proposed
+            task = replace(task, input_state=input_state)
 
         execution_base_commit: str | None = None
         proposed_context = task.input_state.get("proposed_pr_context")

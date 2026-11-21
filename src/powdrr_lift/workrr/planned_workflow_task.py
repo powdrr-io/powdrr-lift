@@ -69,6 +69,17 @@ def run_planned_workflow_task(
 ) -> int:
     """Prepare and execute a single plan item without polling the GitHub queue."""
     root = repo_root.resolve()
+    from powdrr_service.planning.repair import item_input_contract_digest
+
+    work_item_identity = {
+        "schema": "powdrr-work-item-publication-v1",
+        "repository": options.repository,
+        "issue_number": item.github_issue_number,
+        "plan_id": plan.plan_id,
+        "item_id": item.item_id,
+        "input_contract_digest": item_input_contract_digest(item, plan.planning),
+        "purpose": "implementation",
+    }
     if workflow_path.is_dir():
         workflow_dir = workflow_path
         execution_root = root
@@ -80,6 +91,7 @@ def run_planned_workflow_task(
             )
         workflow_inputs = dict(instance.inputs)
         workflow_context = dict(workflow_inputs["proposed_pr_context"])
+        workflow_context["work_item_identity"] = work_item_identity
         workflow_context.update(
             {
                 "title": item.title,
@@ -173,6 +185,7 @@ def run_planned_workflow_task(
             repo_root=execution_root,
             workflow_id=workflow_id,
             issue_number=item.github_issue_number,
+            work_item_identity=work_item_identity,
             checkpoint_callback=checkpoint_callback,
             options=options,
         ),
@@ -187,6 +200,7 @@ def _task_config(
     repo_root: Path,
     workflow_id: str,
     issue_number: int | None,
+    work_item_identity: Mapping[str, Any],
     checkpoint_callback: TaskCheckpointCallback,
     options: PlannedWorkflowTaskOptions,
 ) -> WorkflowTaskAgentConfig:
@@ -213,6 +227,7 @@ def _task_config(
         task_checkpoint_callback=checkpoint_callback,
         github_issue_number=issue_number,
         github_repository=options.repository,
+        work_item_identity=work_item_identity,
         claim_guard=options.claim_guard,
     )
 

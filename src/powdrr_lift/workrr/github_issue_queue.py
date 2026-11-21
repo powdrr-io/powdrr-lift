@@ -153,6 +153,7 @@ class _DependencyEvidenceCache:
     dependency_results: dict[tuple[str, str, int | None], bool] = dataclass_field(
         default_factory=dict
     )
+    repository_default_branch: str | None = None
 
     def comments(
         self, client: GitHubIssueClient, issue_number: int
@@ -165,6 +166,11 @@ class _DependencyEvidenceCache:
         if number not in self.pull_requests_by_number:
             self.pull_requests_by_number[number] = client.pull_request(number)
         return self.pull_requests_by_number[number]
+
+    def default_branch(self, client: GitHubIssueClient) -> str:
+        if self.repository_default_branch is None:
+            self.repository_default_branch = client.default_branch()
+        return self.repository_default_branch
 
 
 @dataclass(frozen=True, slots=True)
@@ -806,6 +812,15 @@ class GitHubIssueClient:
                 "plan commit is not reachable from the repository default branch; "
                 "publish only after the plan review PR merges"
             )
+
+    def default_branch(self) -> str:
+        repository = _json_mapping(
+            self._api("GET", f"repos/{self.repository}").stdout, "repository"
+        )
+        branch = repository.get("default_branch")
+        if not isinstance(branch, str) or not branch:
+            raise GitHubIssueQueueError("GitHub did not return the default branch name")
+        return branch
 
     def default_branch_required_checks(self) -> tuple[str, ...] | None:
         """Return required checks, or None when GitHub hides policy on this plan."""
@@ -5735,6 +5750,9 @@ def _dependency_is_fulfilled(
         current,
         comments,
         client=client,
+        plan_id=plan.plan_id,
+        dependency_id=dependency_id,
+        input_contract_digest=expected_digest,
         evidence_cache=evidence_cache,
     ):
         return remember(True)
@@ -5746,6 +5764,9 @@ def _dependency_has_merged_publication(
     comments: Sequence[Mapping[str, Any]],
     *,
     client: GitHubIssueClient,
+    plan_id: str,
+    dependency_id: str,
+    input_contract_digest: str,
     evidence_cache: _DependencyEvidenceCache | None,
 ) -> bool:
     """Recover dependency completion when PR publication outlived its task run."""
@@ -5763,8 +5784,27 @@ def _dependency_has_merged_publication(
         else client.pull_request(pull_request_number)
     )
     merge_commit = pull_request.get("merge_commit_sha")
+    expected_identity = {
+        "schema": "powdrr-work-item-publication-v1",
+        "repository": client.repository,
+        "issue_number": issue.number,
+        "plan_id": plan_id,
+        "item_id": dependency_id,
+        "input_contract_digest": input_contract_digest,
+        "purpose": "implementation",
+    }
+    base = pull_request.get("base")
+    default_branch = (
+        evidence_cache.default_branch(client)
+        if evidence_cache is not None
+        else client.default_branch()
+    )
     return (
         pull_request.get("merged") is True
+        and _pull_request_work_item_identity(pull_request.get("body"))
+        == expected_identity
+        and isinstance(base, Mapping)
+        and base.get("ref") == default_branch
         and _pull_request_closes_issue(
             pull_request.get("body"),
             repository=client.repository,
@@ -5773,6 +5813,21 @@ def _dependency_has_merged_publication(
         and isinstance(merge_commit, str)
         and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit) is not None
     )
+
+
+def _pull_request_work_item_identity(body: object) -> Mapping[str, Any] | None:
+    if not isinstance(body, str):
+        return None
+    marker = re.search(r"<!-- powdrr-work-item-publication:v1 (\{[^\n]*\}) -->", body)
+    if marker is None:
+        return None
+    try:
+        identity = json.loads(marker.group(1))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(identity, Mapping):
+        return None
+    return identity
 
 
 def _latest_published_pr_url_from_issue_comments(

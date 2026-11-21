@@ -253,6 +253,83 @@ def test_abandoned_publication_with_multiple_prs_stays_unresolved(
     assert QUEUE_LABELS["blocked"] in client.get_issue(18).labels
 
 
+def test_worker_reconciles_published_pr_before_claiming_issue(
+    tmp_path: Path,
+) -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    pull_request_url = "https://github.com/example/project/pull/77"
+    client.add_comment(
+        issue,
+        f"Powdrr PR for issue #{issue.number}: {pull_request_url}",
+    )
+    client.pull_requests[77] = {"state": "open", "merged": False}
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-reconciliation",
+        run_task=lambda *_args: pytest.fail(
+            "an existing published PR must prevent implementation from rerunning"
+        ),
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    updated = client.get_issue(issue.number)
+    assert report.outcome == "awaiting_review", report
+    assert report.detail and "implementation was not rerun" in report.detail
+    assert QUEUE_LABELS["awaiting_review"] in updated.labels
+    assert QUEUE_LABELS["ready"] not in updated.labels
+    assert client.pull_request_reads[77] == 1
+
+
+def test_worker_records_post_publication_failure_without_blocking_or_retrying(
+    tmp_path: Path,
+) -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    pull_request_url = "https://github.com/example/project/pull/78"
+    workflow_path = tmp_path / "docs/workflows/base"
+    workflow_path.mkdir(parents=True)
+
+    def fail_during_finalization(*_args: Any) -> int:
+        client.add_comment(
+            issue,
+            f"Powdrr PR for issue #{issue.number}: {pull_request_url}",
+        )
+        raise RuntimeError("generated changelog omitted a deletion hunk")
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-finalization-failure",
+        run_task=fail_during_finalization,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    updated = client.get_issue(issue.number)
+    assert report.outcome == "awaiting_review", report
+    assert report.failure_record is not None
+    assert QUEUE_LABELS["awaiting_review"] in updated.labels
+    assert QUEUE_LABELS["blocked"] not in updated.labels
+    failure = json.loads(Path(report.failure_record).read_text(encoding="utf-8"))
+    assert failure["stage"] == "pr_finalization"
+    assert "PR #78 was published" in failure["detail"]
+    assert "deletion hunk" in failure["detail"]
+
+
 def test_worker_executes_independent_items_concurrently(tmp_path: Path) -> None:
     first_item = PlannedWorkItem(
         "first",
@@ -599,6 +676,10 @@ class FakeIssueClient:
         self.comment_reads: dict[int, int] = {}
         self.pull_requests: dict[int, dict[str, object]] = {}
         self.pull_request_reads: dict[int, int] = {}
+        self.linked_pull_requests_by_issue: dict[
+            int, tuple[dict[str, object], ...]
+        ] = {}
+        self.linked_pull_request_reads: dict[int, int] = {}
         self.labels_ensured = False
         self.fulfillment_label_ensured = False
         self.merged_commit: str | None = None
@@ -700,6 +781,12 @@ class FakeIssueClient:
         self.pull_request_reads[number] = self.pull_request_reads.get(number, 0) + 1
         return self.pull_requests.get(number, {})
 
+    def linked_pull_requests(self, issue_number: int) -> tuple[dict[str, object], ...]:
+        self.linked_pull_request_reads[issue_number] = (
+            self.linked_pull_request_reads.get(issue_number, 0) + 1
+        )
+        return self.linked_pull_requests_by_issue.get(issue_number, ())
+
     def _invoke(
         self, arguments: list[str] | tuple[str, ...], *, check: bool = True
     ) -> subprocess.CompletedProcess[str]:
@@ -719,6 +806,32 @@ class FakeIssueClient:
                 ["gh", *arguments], 0, json.dumps(self.pull_request_files), ""
             )
         return subprocess.CompletedProcess(["gh", *arguments], 1, "", "unexpected")
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["pr", "view", "1047", "--json", "headRefOid"],
+        ["pr", "view", "1047", "--repo", "powdrr-io/powdrr-lift"],
+        ["pr", "view", "1047", "-R", "powdrr-io/powdrr-lift"],
+    ],
+)
+def test_github_issue_client_scopes_pr_commands_to_configured_repository(
+    arguments: list[str],
+) -> None:
+    commands: list[list[str]] = []
+
+    def run(command: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, "{}", "")
+
+    client = GitHubIssueClient("powdrr-io/powdrr-gaterr", run=run)
+
+    client._invoke(arguments, check=False)
+
+    assert commands[0][-2] in {"--repo", "-R"}
+    assert commands[0][-1] == "powdrr-io/powdrr-gaterr"
+    assert commands[0][0] == "gh"
 
 
 def _closed_issue_worktree(tmp_path: Path, *, dirty: bool = False) -> tuple[Path, Path]:
@@ -965,6 +1078,143 @@ def test_dependency_recovers_a_merged_published_pr_without_task_checkpoint(
 
     assert fulfilled is expected
     assert client.pull_request_reads.get(123, 0) == (1 if marker_issue == 100 else 0)
+
+
+def test_dependency_recovers_merged_closing_pr_from_github_timeline() -> None:
+    client = FakeIssueClient()
+    issue = QueueIssue(
+        100,
+        "Base work",
+        github_issue_queue._issue_pointer_body(
+            "feature-v1",
+            "base",
+            "docs/plans/feature.yaml",
+            PLAN_COMMIT,
+            repository=client.repository,
+        ),
+        "closed",
+        (QUEUE_LABELS["awaiting_review"], _plan_label("feature-v1")),
+        "https://github.com/example/project/issues/100",
+    )
+    client.linked_pull_requests_by_issue[100] = (
+        {
+            "html_url": "https://github.com/example/project/pull/123",
+            "body": "Closes #100",
+        },
+    )
+    from powdrr_service.planning.repair import item_input_contract_digest
+
+    item = plan().items[0]
+    identity = {
+        "schema": "powdrr-work-item-publication-v1",
+        "repository": client.repository,
+        "issue_number": issue.number,
+        "plan_id": "feature-v1",
+        "item_id": "base",
+        "input_contract_digest": item_input_contract_digest(item, plan().planning),
+        "purpose": "implementation",
+    }
+    body = (
+        "Closes #100\n\n<!-- powdrr-work-item-publication:v1 "
+        + json.dumps(identity, sort_keys=True, separators=(",", ":"))
+        + " -->"
+    )
+    client.pull_requests[123] = {
+        "merged": True,
+        "merge_commit_sha": "d" * 40,
+        "base": {"ref": "main"},
+        "body": body,
+    }
+
+    fulfilled = github_issue_queue._dependency_is_fulfilled(
+        issue,
+        {issue.number: issue},
+        client=client,  # type: ignore[arg-type]
+        plan=plan(),
+        dependency_id="base",
+    )
+
+    assert fulfilled is True
+    assert client.linked_pull_request_reads == {100: 1}
+    assert client.pull_request_reads == {123: 1}
+
+
+@pytest.mark.parametrize(
+    ("linked_url", "linked_body", "merged", "merge_sha", "expected"),
+    [
+        (
+            "https://github.com/other/project/pull/123",
+            "Closes #100",
+            True,
+            "d" * 40,
+            False,
+        ),
+        (
+            "https://github.com/example/project/pull/123",
+            "Closes #999",
+            True,
+            "d" * 40,
+            False,
+        ),
+        (
+            "https://github.com/example/project/pull/123",
+            "Closes #100",
+            False,
+            None,
+            False,
+        ),
+        (
+            "https://github.com/example/project/pull/123",
+            "Closes #100",
+            True,
+            "not-a-merge-sha",
+            False,
+        ),
+    ],
+)
+def test_dependency_timeline_recovery_rejects_unverified_cross_references(
+    linked_url: str,
+    linked_body: str,
+    merged: bool,
+    merge_sha: str | None,
+    expected: bool,
+) -> None:
+    client = FakeIssueClient()
+    issue = QueueIssue(
+        100,
+        "Base work",
+        github_issue_queue._issue_pointer_body(
+            "feature-v1",
+            "base",
+            "docs/plans/feature.yaml",
+            PLAN_COMMIT,
+            repository=client.repository,
+        ),
+        "closed",
+        (),
+        "https://github.com/example/project/issues/100",
+    )
+    client.linked_pull_requests_by_issue[100] = (
+        {"html_url": linked_url, "body": linked_body},
+    )
+    client.pull_requests[123] = {
+        "merged": merged,
+        "merge_commit_sha": merge_sha,
+        "body": linked_body,
+    }
+
+    fulfilled = github_issue_queue._dependency_is_fulfilled(
+        issue,
+        {issue.number: issue},
+        client=client,  # type: ignore[arg-type]
+        plan=plan(),
+        dependency_id="base",
+    )
+
+    assert fulfilled is expected
+    assert client.pull_request_reads.get(123, 0) == (
+        0 if "other/project" in linked_url or "#999" in linked_body else 1
+    )
 
 
 def test_worker_promotes_next_item_from_merged_publication_without_task_checkpoint(
@@ -1305,6 +1555,52 @@ def test_github_issue_client_filters_issue_state_locally_for_labeled_queries() -
     assert commands[0][-1] == (
         "repos/example/project/issues?state=all&per_page=100&labels=powdrr%3Aready"
     )
+
+
+def test_github_issue_client_reads_pull_request_cross_references_from_timeline() -> (
+    None
+):
+    commands: list[list[str]] = []
+    linked_pr = {
+        "number": 123,
+        "html_url": "https://github.com/example/project/pull/123",
+        "body": "Closes #100",
+        "pull_request": {"merged_at": "2026-11-21T05:25:00Z"},
+    }
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        return subprocess.CompletedProcess(
+            arguments,
+            0,
+            json.dumps(
+                [
+                    {"event": "labeled", "label": {"name": "powdrr:ready"}},
+                    {
+                        "event": "cross-referenced",
+                        "source": {"issue": linked_pr},
+                    },
+                    {"event": "cross-referenced", "source": {"issue": {"number": 5}}},
+                ]
+            ),
+            "",
+        )
+
+    result = GitHubIssueClient("example/project", run=run).linked_pull_requests(100)
+
+    assert result == (linked_pr,)
+    assert commands == [
+        [
+            "gh",
+            "api",
+            "-H",
+            "Accept: application/vnd.github+json",
+            "--paginate",
+            "repos/example/project/issues/100/timeline?per_page=100",
+        ]
+    ]
 
 
 def test_github_issue_comment_retries_github_rate_limits_with_backoff() -> None:

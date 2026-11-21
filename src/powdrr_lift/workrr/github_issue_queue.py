@@ -150,6 +150,9 @@ class _DependencyEvidenceCache:
     pull_requests_by_number: dict[int, Mapping[str, Any]] = dataclass_field(
         default_factory=dict
     )
+    linked_pull_requests_by_issue: dict[int, tuple[Mapping[str, Any], ...]] = (
+        dataclass_field(default_factory=dict)
+    )
     dependency_results: dict[tuple[str, str, int | None], bool] = dataclass_field(
         default_factory=dict
     )
@@ -171,6 +174,15 @@ class _DependencyEvidenceCache:
         if self.repository_default_branch is None:
             self.repository_default_branch = client.default_branch()
         return self.repository_default_branch
+
+    def linked_pull_requests(
+        self, client: GitHubIssueClient, issue_number: int
+    ) -> tuple[Mapping[str, Any], ...]:
+        if issue_number not in self.linked_pull_requests_by_issue:
+            self.linked_pull_requests_by_issue[issue_number] = (
+                client.linked_pull_requests(issue_number)
+            )
+        return self.linked_pull_requests_by_issue[issue_number]
 
 
 @dataclass(frozen=True, slots=True)
@@ -1115,6 +1127,36 @@ class GitHubIssueClient:
         result = self._api("GET", f"repos/{self.repository}/pulls/{number}")
         return _json_mapping(result.stdout, "pull request")
 
+    def linked_pull_requests(self, issue_number: int) -> tuple[Mapping[str, Any], ...]:
+        """Return PRs GitHub records as cross-references for this issue."""
+        result = self._invoke(
+            [
+                "api",
+                "-H",
+                "Accept: application/vnd.github+json",
+                "--paginate",
+                f"repos/{self.repository}/issues/{issue_number}/timeline?per_page=100",
+            ]
+        )
+        events = _parse_paginated_json_arrays(
+            result.stdout, description="issue timeline"
+        )
+        linked: list[Mapping[str, Any]] = []
+        for event in events:
+            if (
+                not isinstance(event, Mapping)
+                or event.get("event") != "cross-referenced"
+            ):
+                continue
+            source = event.get("source")
+            source_issue = source.get("issue") if isinstance(source, Mapping) else None
+            if not isinstance(source_issue, Mapping) or not isinstance(
+                source_issue.get("pull_request"), Mapping
+            ):
+                continue
+            linked.append(source_issue)
+        return tuple(linked)
+
     def _api(
         self, method: str, endpoint: str, *arguments: str
     ) -> subprocess.CompletedProcess[str]:
@@ -1130,8 +1172,21 @@ class GitHubIssueClient:
     def _invoke(
         self, arguments: Sequence[str], *, check: bool = True
     ) -> subprocess.CompletedProcess[str]:
+        command = [self.executable, *arguments]
+        if arguments and arguments[0] == "pr":
+            repo_flag_indexes = [
+                index
+                for index, value in enumerate(command)
+                if value in {"--repo", "-R"}
+            ]
+            if any(index + 1 >= len(command) for index in repo_flag_indexes):
+                raise GitHubIssueQueueError("gh pr repository flag needs a value")
+            for index in repo_flag_indexes:
+                command[index + 1] = self.repository
+            if not repo_flag_indexes:
+                command.extend(("--repo", self.repository))
         result = self._run(
-            [self.executable, *arguments],
+            command,
             capture_output=True,
             text=True,
             check=False,
@@ -1522,6 +1577,50 @@ def run_worker_once(
             pointer = parse_issue_pointer(issue.body)
             if pointer is None:
                 continue
+            published_pr_url = _latest_published_pr_url_from_issue_comments(
+                client.list_comments(issue.number), issue_number=issue.number
+            )
+            if published_pr_url is not None:
+                pr_number = _same_repository_pull_request_number(
+                    published_pr_url, client.repository
+                )
+                pull_request = (
+                    client.pull_request(pr_number) if pr_number is not None else {}
+                )
+                if pr_number is None:
+                    status = "blocked"
+                    published_pr_detail = (
+                        "A published PR marker exists, but its URL does not point "
+                        "to this repository; implementation was not rerun."
+                    )
+                elif str(pull_request.get("state", "")).lower() == "open":
+                    status = "awaiting_review"
+                    published_pr_detail = (
+                        f"Existing published PR #{pr_number} is still open; "
+                        "implementation was not rerun."
+                    )
+                else:
+                    status = "blocked"
+                    published_pr_detail = (
+                        f"Published PR #{pr_number} is no longer open, but the "
+                        "issue remains open. Review the PR and issue state before "
+                        "retrying implementation."
+                    )
+                client.update_issue(
+                    issue,
+                    labels=_replace_queue_status(issue.labels, status),
+                )
+                client.add_comment(
+                    issue,
+                    "Powdrr reconciliation: "
+                    f"{published_pr_detail}\n\n{published_pr_url}",
+                )
+                return WorkerReport(
+                    status,
+                    issue.number,
+                    pointer["item_id"],
+                    published_pr_detail,
+                )
             plan_key = (
                 pointer["plan_id"],
                 pointer["plan_path"],
@@ -1948,16 +2047,45 @@ def run_worker_once(
                         )
                     outcome = ci_outcome
             else:
-                status = "blocked"
-                outcome = "blocked"
-                detail = detail or "Task runner returned a non-success exit code."
+                published_pr_url = _latest_published_pr_url_from_issue_comments(
+                    client.list_comments(issue.number), issue_number=issue.number
+                )
+                published_pr_number = (
+                    _same_repository_pull_request_number(
+                        published_pr_url, client.repository
+                    )
+                    if published_pr_url is not None
+                    else None
+                )
+                if published_pr_number is not None:
+                    status = "awaiting_review"
+                    outcome = "awaiting_review"
+                    stage = "pr_finalization"
+                    detail = (
+                        f"PR #{published_pr_number} was published at "
+                        f"{published_pr_url}, but post-publication finalization "
+                        "failed: "
+                        f"{detail or 'task runner returned a non-success exit code.'}"
+                    )
+                    note = (
+                        "Powdrr published a PR, but post-publication finalization "
+                        "failed. The issue is recorded as awaiting review and the "
+                        "implementation will not be rerun automatically.\n\n"
+                        f"{detail}"
+                    )
+                else:
+                    status = "blocked"
+                    outcome = "blocked"
+                    stage = "implementation"
+                    detail = detail or "Task runner returned a non-success exit code."
+                    note = f"Powdrr execution failed during implementation.\n\n{detail}"
                 failure = TaskExecutionResult(
                     plan_id=plan.plan_id,
                     item_id=item.item_id,
                     workflow_id=item.workflow_id,
                     issue_number=issue.number,
                     worker_id=worker_id,
-                    stage="implementation",
+                    stage=stage,
                     outcome="failed",
                     detail=detail,
                     runner_exit_code=(
@@ -1965,10 +2093,9 @@ def run_worker_once(
                     ),
                 )
                 failure_path = _write_task_execution_result(root, failure)
-                note = (
-                    "Powdrr execution failed during implementation.\n\n"
-                    f"{detail}\n\n"
-                    f"Durable diagnostic: `{failure_path.relative_to(root).as_posix()}`"
+                note += (
+                    "\n\nDurable diagnostic: "
+                    f"`{failure_path.relative_to(root).as_posix()}`"
                 )
             issue = client.get_issue(issue.number)
             client.update_issue(
@@ -5769,21 +5896,12 @@ def _dependency_has_merged_publication(
     input_contract_digest: str,
     evidence_cache: _DependencyEvidenceCache | None,
 ) -> bool:
-    """Recover dependency completion when PR publication outlived its task run."""
     pull_request_url = _latest_published_pr_url_from_issue_comments(
         comments, issue_number=issue.number
     )
     pull_request_number = _same_repository_pull_request_number(
         pull_request_url, client.repository
     )
-    if pull_request_number is None:
-        return False
-    pull_request = (
-        evidence_cache.pull_request(client, pull_request_number)
-        if evidence_cache is not None
-        else client.pull_request(pull_request_number)
-    )
-    merge_commit = pull_request.get("merge_commit_sha")
     expected_identity = {
         "schema": "powdrr-work-item-publication-v1",
         "repository": client.repository,
@@ -5793,26 +5911,58 @@ def _dependency_has_merged_publication(
         "input_contract_digest": input_contract_digest,
         "purpose": "implementation",
     }
-    base = pull_request.get("base")
     default_branch = (
         evidence_cache.default_branch(client)
         if evidence_cache is not None
         else client.default_branch()
     )
-    return (
-        pull_request.get("merged") is True
-        and _pull_request_work_item_identity(pull_request.get("body"))
-        == expected_identity
-        and isinstance(base, Mapping)
-        and base.get("ref") == default_branch
-        and _pull_request_closes_issue(
-            pull_request.get("body"),
+    candidates: set[int] = set()
+    if pull_request_number is not None:
+        candidates.add(pull_request_number)
+    # The issue timeline can retain a PR cross-reference if the worker exits
+    # before it records the issue comment or task checkpoint.
+    linked_pull_requests = (
+        evidence_cache.linked_pull_requests(client, issue.number)
+        if evidence_cache is not None
+        else client.linked_pull_requests(issue.number)
+    )
+    for linked in linked_pull_requests:
+        number = _same_repository_pull_request_number(
+            linked.get("html_url"), client.repository
+        )
+        if number is not None and _pull_request_closes_issue(
+            linked.get("body"),
             repository=client.repository,
             issue_number=issue.number,
+        ):
+            candidates.add(number)
+
+    valid_publications: list[int] = []
+    for number in sorted(candidates):
+        pull_request = (
+            evidence_cache.pull_request(client, number)
+            if evidence_cache is not None
+            else client.pull_request(number)
         )
-        and isinstance(merge_commit, str)
-        and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit) is not None
-    )
+        merge_commit = pull_request.get("merge_commit_sha")
+        base = pull_request.get("base")
+        if (
+            pull_request.get("merged") is True
+            and _pull_request_work_item_identity(pull_request.get("body"))
+            == expected_identity
+            and isinstance(base, Mapping)
+            and base.get("ref") == default_branch
+            and _pull_request_closes_issue(
+                pull_request.get("body"),
+                repository=client.repository,
+                issue_number=issue.number,
+            )
+            and isinstance(merge_commit, str)
+            and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit)
+            is not None
+        ):
+            valid_publications.append(number)
+    return len(valid_publications) == 1
 
 
 def _pull_request_work_item_identity(body: object) -> Mapping[str, Any] | None:

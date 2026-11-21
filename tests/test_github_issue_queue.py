@@ -675,6 +675,10 @@ class FakeIssueClient:
         self.comment_reads: dict[int, int] = {}
         self.pull_requests: dict[int, dict[str, object]] = {}
         self.pull_request_reads: dict[int, int] = {}
+        self.linked_pull_requests_by_issue: dict[
+            int, tuple[dict[str, object], ...]
+        ] = {}
+        self.linked_pull_request_reads: dict[int, int] = {}
         self.labels_ensured = False
         self.fulfillment_label_ensured = False
         self.merged_commit: str | None = None
@@ -772,6 +776,12 @@ class FakeIssueClient:
     def pull_request(self, number: int) -> dict[str, object]:
         self.pull_request_reads[number] = self.pull_request_reads.get(number, 0) + 1
         return self.pull_requests.get(number, {})
+
+    def linked_pull_requests(self, issue_number: int) -> tuple[dict[str, object], ...]:
+        self.linked_pull_request_reads[issue_number] = (
+            self.linked_pull_request_reads.get(issue_number, 0) + 1
+        )
+        return self.linked_pull_requests_by_issue.get(issue_number, ())
 
     def _invoke(
         self, arguments: list[str] | tuple[str, ...], *, check: bool = True
@@ -1039,6 +1049,125 @@ def test_dependency_recovers_a_merged_published_pr_without_task_checkpoint(
 
     assert fulfilled is expected
     assert client.pull_request_reads.get(123, 0) == (1 if marker_issue == 100 else 0)
+
+
+def test_dependency_recovers_merged_closing_pr_from_github_timeline() -> None:
+    client = FakeIssueClient()
+    issue = QueueIssue(
+        100,
+        "Base work",
+        github_issue_queue._issue_pointer_body(
+            "feature-v1",
+            "base",
+            "docs/plans/feature.yaml",
+            PLAN_COMMIT,
+            repository=client.repository,
+        ),
+        "closed",
+        (QUEUE_LABELS["awaiting_review"], _plan_label("feature-v1")),
+        "https://github.com/example/project/issues/100",
+    )
+    client.linked_pull_requests_by_issue[100] = (
+        {
+            "html_url": "https://github.com/example/project/pull/123",
+            "body": "Closes #100",
+        },
+    )
+    client.pull_requests[123] = {
+        "merged": True,
+        "merge_commit_sha": "d" * 40,
+        "body": "Closes #100",
+    }
+
+    fulfilled = github_issue_queue._dependency_is_fulfilled(
+        issue,
+        {issue.number: issue},
+        client=client,  # type: ignore[arg-type]
+        plan=plan(),
+        dependency_id="base",
+    )
+
+    assert fulfilled is True
+    assert client.linked_pull_request_reads == {100: 1}
+    assert client.pull_request_reads == {123: 1}
+
+
+@pytest.mark.parametrize(
+    ("linked_url", "linked_body", "merged", "merge_sha", "expected"),
+    [
+        (
+            "https://github.com/other/project/pull/123",
+            "Closes #100",
+            True,
+            "d" * 40,
+            False,
+        ),
+        (
+            "https://github.com/example/project/pull/123",
+            "Closes #999",
+            True,
+            "d" * 40,
+            False,
+        ),
+        (
+            "https://github.com/example/project/pull/123",
+            "Closes #100",
+            False,
+            None,
+            False,
+        ),
+        (
+            "https://github.com/example/project/pull/123",
+            "Closes #100",
+            True,
+            "not-a-merge-sha",
+            False,
+        ),
+    ],
+)
+def test_dependency_timeline_recovery_rejects_unverified_cross_references(
+    linked_url: str,
+    linked_body: str,
+    merged: bool,
+    merge_sha: str | None,
+    expected: bool,
+) -> None:
+    client = FakeIssueClient()
+    issue = QueueIssue(
+        100,
+        "Base work",
+        github_issue_queue._issue_pointer_body(
+            "feature-v1",
+            "base",
+            "docs/plans/feature.yaml",
+            PLAN_COMMIT,
+            repository=client.repository,
+        ),
+        "closed",
+        (),
+        "https://github.com/example/project/issues/100",
+    )
+    client.linked_pull_requests_by_issue[100] = (
+        {"html_url": linked_url, "body": linked_body},
+    )
+    client.pull_requests[123] = {
+        "merged": merged,
+        "merge_commit_sha": merge_sha,
+        "body": linked_body,
+    }
+
+    fulfilled = github_issue_queue._dependency_is_fulfilled(
+        issue,
+        {issue.number: issue},
+        client=client,  # type: ignore[arg-type]
+        plan=plan(),
+        dependency_id="base",
+    )
+
+    assert fulfilled is expected
+    assert client.pull_request_reads.get(123, 0) == (
+        0 if "other/project" in linked_url or "#999" in linked_body else 1
+    )
 
 
 def test_worker_promotes_next_item_from_merged_publication_without_task_checkpoint(
@@ -1360,6 +1489,52 @@ def test_github_issue_client_filters_issue_state_locally_for_labeled_queries() -
     assert commands[0][-1] == (
         "repos/example/project/issues?state=all&per_page=100&labels=powdrr%3Aready"
     )
+
+
+def test_github_issue_client_reads_pull_request_cross_references_from_timeline() -> (
+    None
+):
+    commands: list[list[str]] = []
+    linked_pr = {
+        "number": 123,
+        "html_url": "https://github.com/example/project/pull/123",
+        "body": "Closes #100",
+        "pull_request": {"merged_at": "2026-11-21T05:25:00Z"},
+    }
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        return subprocess.CompletedProcess(
+            arguments,
+            0,
+            json.dumps(
+                [
+                    {"event": "labeled", "label": {"name": "powdrr:ready"}},
+                    {
+                        "event": "cross-referenced",
+                        "source": {"issue": linked_pr},
+                    },
+                    {"event": "cross-referenced", "source": {"issue": {"number": 5}}},
+                ]
+            ),
+            "",
+        )
+
+    result = GitHubIssueClient("example/project", run=run).linked_pull_requests(100)
+
+    assert result == (linked_pr,)
+    assert commands == [
+        [
+            "gh",
+            "api",
+            "-H",
+            "Accept: application/vnd.github+json",
+            "--paginate",
+            "repos/example/project/issues/100/timeline?per_page=100",
+        ]
+    ]
 
 
 def test_github_issue_comment_retries_github_rate_limits_with_backoff() -> None:

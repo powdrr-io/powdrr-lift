@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1661
+title: Recover merged dependency PRs from issue timelines
+intent:
+  problem: A dependency issue can remain blocked after its implementation PR has merged when the worker fails before recording the publication marker or completion checkpoint.
+  goal: Let Powdrr reconcile merged implementation PRs from GitHub's durable issue timeline so downstream work can continue without human bookkeeping.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 153, end_line: 155}
+    summary: Cache linked pull requests discovered for each dependency issue during queue reconciliation.
+    rationale: Avoid repeated timeline API calls when the same dependency is evaluated more than once.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 172, end_line: 180}
+    summary: Cache the linked pull requests found for each dependency issue.
+    rationale: Reuse the timeline evidence across dependency checks in one queue run.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1115, end_line: 1144}
+    summary: Read pull request cross-references from GitHub's issue timeline API.
+    rationale: Recover durable links to published PRs even when Powdrr did not write its issue marker.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 5885, end_line: 5896}
+    summary: Validate timeline-linked PRs against the exact issue, repository, merged state, and merge commit before fulfilling a dependency.
+    rationale: Resume downstream work only when the linked implementation is proven to have merged and closed this dependency.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 5898, end_line: 5928}
+    summary: Verify each recovered PR's merged state, closing reference, and merge commit.
+    rationale: Preserve strict evidence requirements before unblocking downstream work.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 678, end_line: 681}
+    summary: Add timeline link storage and request accounting to the GitHub issue client test double.
+    rationale: Make dependency recovery tests deterministic and verify timeline evidence is read once.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 780, end_line: 785}
+    summary: Implement linked PR lookup in the GitHub issue client test double.
+    rationale: Exercise dependency reconciliation without live GitHub calls.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 1054, end_line: 1172}
+    summary: Cover successful timeline recovery and reject cross-repository, wrong-issue, unmerged, or invalid-merge evidence.
+    rationale: Prevent unrelated or incomplete PRs from unblocking dependent work.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 1494, end_line: 1539}
+    summary: Verify timeline API parsing returns only cross-referenced pull requests.
+    rationale: Ensure GitHub timeline events are interpreted deterministically.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

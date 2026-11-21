@@ -1,0 +1,28 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1656
+title: Resume CI observation after interrupted PR publication
+intent:
+  problem: A worker can exit after publishing an implementation PR, leaving the issue blocked while CI and review continue remotely.
+  goal: Recover a uniquely identified open PR from its issue link and resume CI tracking without rerunning implementation.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 508, end_line: 561}
+    summary: Reconcile one same-repository open PR that explicitly closes the issue and retain its number, URL, and head in the claim.
+    rationale: Preserve valid publication and transfer the issue to CI observation after worker interruption.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 193, end_line: 251}
+    summary: Verify a unique linked PR resumes CI tracking and multiple candidates remain unresolved.
+    rationale: Prevent duplicate implementation while avoiding arbitrary selection among competing PRs.
+entities:
+  - id: abandoned-published-pr-reconciliation
+    type: Technical specification
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

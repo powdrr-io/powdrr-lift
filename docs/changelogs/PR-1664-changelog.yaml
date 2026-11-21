@@ -1,0 +1,184 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1664
+title: Batch test-design planning questions
+intent:
+  problem: Independent PR-item test-design questions remain separate provider calls because paired prompts exceed the generic combined input limit, and malformed batch members can be retried in the same batch after journal replay.
+  goal: Batch test-design questions in bounded pairs and replay failed batch members individually while preserving each member's question identity, schema, parser, and size limit.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 24, end_line: 24}
+    summary: Define the 48,000-character combined test-design batch limit.
+    rationale: Allow bounded pairs of independent PR-item design requests without changing each member's 24,000-character limit.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Export the test-design batch input limit.
+    rationale: Make the bound available to tests and callers.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 236, end_line: 236}
+    summary: Limit work-unit and test-design proposal batches to two members.
+    rationale: Keep semantically rich response batches small and reviewable.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 402, end_line: 403}
+    summary: Apply the dedicated combined input limit to test-design batches.
+    rationale: Retain the 24,000-character default for every individual request while allowing bounded paired test-design prompts.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 265, end_line: 270}
+    summary: Return batch-failure replay groups alongside accepted answers and work-unit split groups.
+    rationale: Track failed batch members by question kind and subject IDs.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 274, end_line: 274}
+    summary: Collect failed generic batch question groups during journal replay.
+    rationale: Preserve split instructions across process restarts.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 294, end_line: 295}
+    summary: Read the parent batch identity and question kind from failed checkpoints.
+    rationale: Associate the failed member with the batch to recover.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 297, end_line: 305}
+    summary: Select members with durable batch lineage for individual replay.
+    rationale: Avoid issuing the same malformed batch repeatedly.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 311, end_line: 311}
+    summary: Reuse parsed batch identity in work-unit oversized-response recovery.
+    rationale: Keep existing work-unit fallback behavior consistent with generic batch replay.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 317, end_line: 322}
+    summary: Return all replay state required by question batching.
+    rationale: Allow both work-unit group splitting and generic batch member separation.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 587, end_line: 592}
+    summary: Receive generic failed-batch groups during normal planning resume.
+    rationale: Restore the singleton retry shape before deriving the next frontier.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 597, end_line: 601}
+    summary: Configure generic batch-group splitting on the resumed state machine.
+    rationale: Retry failed members separately while batching unaffected questions.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1467, end_line: 1472}
+    summary: Receive generic failed-batch groups during planning operation initialization.
+    rationale: Keep both supported resume entry points consistent.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1478, end_line: 1482}
+    summary: Configure generic batch-group splitting in the operation executor.
+    rationale: Ensure durable resume behavior is independent of invocation path.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 539, end_line: 539}
+    summary: Track generic question groups selected for singleton replay.
+    rationale: Keep replay state in the deterministic state machine.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 589, end_line: 598}
+    summary: Configure question groups whose failed batch members must be separated.
+    rationale: Bind journal replay instructions to question kinds and stable subject IDs.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 616, end_line: 639}
+    summary: Batch unaffected questions while keeping replay-selected members separate.
+    rationale: Recover failed members without disabling batching for the rest of the frontier.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1262, end_line: 1268}
+    summary: Enforce a two-member maximum for work-unit and test-design batches.
+    rationale: Keep the scale benchmark's batch-size guard aligned with planner limits.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 6, end_line: 10}
+    summary: Import the test-design batch limit and batching helper.
+    rationale: Cover the combined request contract.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 160, end_line: 192}
+    summary: Verify two test-design questions batch under the dedicated input bound and preserve per-member parsing.
+    rationale: Protect the original answer schemas and IDs through batch parsing.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 37, end_line: 37}
+    summary: Import test-design source evidence for replay splitting coverage.
+    rationale: Build realistic typed requests for driver batching tests.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 47, end_line: 47}
+    summary: Import the test-design question builder.
+    rationale: Exercise the actual planner question shape.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 1378, end_line: 1403}
+    summary: Verify one failed batch member replays alone and unaffected members remain batched.
+    rationale: Protect selective fallback behavior.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1106, end_line: 1132}
+    summary: Add a failed test-design batch checkpoint with durable parent identity.
+    rationale: Exercise generic batch lineage recovery through the planning journal.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1136, end_line: 1136}
+    summary: Capture replay groups on the state-machine test double.
+    rationale: Assert the journal's replay instruction is propagated.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1143, end_line: 1147}
+    summary: Implement generic failed-group capture in the replay test double.
+    rationale: Verify the service configures batch splitting before resuming.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1164, end_line: 1167}
+    summary: Assert failed test-design groups are selected for singleton replay.
+    rationale: Tie the persisted batch ID to the recovery behavior.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 156, end_line: 159}
+    summary: Assert the synthetic profile pairs test-design questions and reduces their call count.
+    rationale: Verify call savings alongside source-obligation coverage.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 731, end_line: 742}
+    summary: Record paired test-design batching, measured call reduction, and live-provider evaluation gap.
+    rationale: Keep the active planner-efficiency plan aligned with evidence.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 878, end_line: 887}
+    summary: Document test-design batch bounds, replay behavior, and semantic-completeness limitation.
+    rationale: Keep the planning LLM audit current.
+entities:
+  - id: test-design-question-batching
+    type: Function
+    action: added
+  - id: failed-question-batch-singleton-replay
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: replay-test-protects-test-design-batches
+    type: verifies
+    source: failed-question-batch-singleton-replay
+    target: test-design-question-batching
+    action: added
+    description: The replay regression test verifies a failed test-design member is separated while unaffected questions remain batchable.
+invariants:
+  - id: test-design-batch-members-retain-independent-contracts
+    description: Batched test-design members retain their individual question IDs, answer schemas, parsers, and 24,000-character input limits.
+    action: added
+  - id: malformed-question-batches-replay-individually
+    description: A failed batch member with a parent batch ID is not issued again in the same batch on resume.
+    action: added
+  - id: synthetic-call-reduction-is-not-live-quality-proof
+    description: Deterministic profile call-count reductions do not establish live-model semantic completeness for typed behavior scenarios.
+    action: added
+guidance: []

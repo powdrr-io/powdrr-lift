@@ -339,12 +339,14 @@ class _QuestionTelemetryClient:
         self.completion_tokens = 0
         self.has_prompt_tokens = False
         self.has_completion_tokens = False
+        self.provider_calls: list[dict[str, Any]] = []
 
     def complete_json(self, messages: list[dict[str, str]], **kwargs: Any) -> Any:
         self.prompt_chars += sum(
             len(message.get("content", "")) for message in messages
         )
         self.api_calls += 1
+        call_started = time.monotonic()
         try:
             parameters = inspect.signature(self._client.complete_json).parameters
             supports_schema = "response_schema" in parameters or any(
@@ -358,11 +360,24 @@ class _QuestionTelemetryClient:
             )
         except Exception:
             self.provider_failures += 1
+            self.provider_calls.append(
+                {"outcome": "error", "cost_amount": None, "cost_currency": None}
+            )
             raise
         self.response_chars += len(
             json.dumps(answer, ensure_ascii=False, separators=(",", ":"))
         )
+        if getattr(self._client, "last_call_was_seeded", False):
+            return answer
         usage = getattr(self._client, "last_usage", None)
+        call_usage: dict[str, Any] = {
+            "outcome": "accepted",
+            "elapsed_ms": round((time.monotonic() - call_started) * 1000, 3),
+            "prompt_tokens": None,
+            "completion_tokens": None,
+            "cost_amount": None,
+            "cost_currency": None,
+        }
         if isinstance(usage, Mapping):
             prompt = usage.get("prompt_tokens", usage.get("input_tokens"))
             completion = usage.get("completion_tokens", usage.get("output_tokens"))
@@ -372,6 +387,17 @@ class _QuestionTelemetryClient:
             if isinstance(completion, int) and not isinstance(completion, bool):
                 self.completion_tokens += completion
                 self.has_completion_tokens = True
+            if isinstance(prompt, int) and not isinstance(prompt, bool):
+                call_usage["prompt_tokens"] = prompt
+            if isinstance(completion, int) and not isinstance(completion, bool):
+                call_usage["completion_tokens"] = completion
+            cost = usage.get("cost_amount", usage.get("cost"))
+            currency = usage.get("cost_currency", usage.get("currency"))
+            if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+                call_usage["cost_amount"] = cost
+            if isinstance(currency, str):
+                call_usage["cost_currency"] = currency
+        self.provider_calls.append(call_usage)
         return answer
 
 
@@ -1025,6 +1051,7 @@ def _run_question_batch(
                 else None
             ),
             "pagination": pagination,
+            "provider_calls": telemetry_client.provider_calls,
         }
         return request, result, error, output.getvalue(), metric
 
@@ -1061,11 +1088,18 @@ class _SeededBatchAnswerClient:
         self._client = client
         self._answer = answer
         self._used_answer = False
+        self.last_call_was_seeded = False
+
+    @property
+    def last_usage(self) -> Any:
+        return getattr(self._client, "last_usage", None)
 
     def complete_json(self, messages: list[dict[str, str]], **kwargs: Any) -> Any:
         if not self._used_answer:
             self._used_answer = True
+            self.last_call_was_seeded = True
             return self._answer
+        self.last_call_was_seeded = False
         return self._client.complete_json(messages, **kwargs)
 
 
@@ -1101,6 +1135,7 @@ def _run_decision_question_batch(
         )
         batch_error: Exception | None = None
         answers: list[Any] = []
+        batch_usage: dict[str, Any]
         try:
             answers = batch_client(
                 [
@@ -1117,6 +1152,10 @@ def _run_decision_question_batch(
                 )
         except Exception as caught_batch_error:
             batch_error = caught_batch_error
+        batch_usage = _provider_usage_record(
+            client, outcome="error" if batch_error is not None else "accepted"
+        )
+        batch_usage["elapsed_ms"] = round((time.monotonic() - started) * 1000, 3)
         batch_elapsed_ms = (time.monotonic() - started) * 1000
         for index, request in enumerate(batch_requests):
             telemetry_client = _QuestionTelemetryClient(
@@ -1195,6 +1234,8 @@ def _run_decision_question_batch(
                 "prompt_tokens": None,
                 "completion_tokens": None,
                 "pagination": [],
+                "provider_calls": ([batch_usage] if index == 0 else [])
+                + telemetry_client.provider_calls,
             }
             if output.getvalue():
                 output_stream.write(output.getvalue())
@@ -1210,6 +1251,32 @@ def _run_decision_question_batch(
     if callable(flush):
         flush()
     return tuple(outcomes)
+
+
+def _provider_usage_record(client: Any, *, outcome: str) -> dict[str, Any]:
+    """Copy provider-reported usage without retaining request or response data."""
+    usage = getattr(client, "last_usage", None)
+    record: dict[str, Any] = {
+        "outcome": outcome,
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "cost_amount": None,
+        "cost_currency": None,
+    }
+    if isinstance(usage, Mapping):
+        prompt = usage.get("prompt_tokens", usage.get("input_tokens"))
+        completion = usage.get("completion_tokens", usage.get("output_tokens"))
+        cost = usage.get("cost_amount", usage.get("cost"))
+        currency = usage.get("cost_currency", usage.get("currency"))
+        if isinstance(prompt, int) and not isinstance(prompt, bool):
+            record["prompt_tokens"] = prompt
+        if isinstance(completion, int) and not isinstance(completion, bool):
+            record["completion_tokens"] = completion
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+            record["cost_amount"] = cost
+        if isinstance(currency, str):
+            record["cost_currency"] = currency
+    return record
 
 
 def _question_telemetry_context(request: QuestionRequest[Any]) -> Mapping[str, Any]:

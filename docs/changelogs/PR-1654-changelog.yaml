@@ -1,0 +1,229 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1654
+title: Track provider-reported planning usage and cost
+intent:
+  problem: Planning telemetry counts calls and tokens but omits provider-reported cost, and native decision batches discard usage metadata.
+  goal: Preserve usage once per provider call, summarize cost completeness without estimating prices, and update the planning audit to reflect implemented milestones.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Mark the first planning milestones as implemented.
+    rationale: Keep the audit status current.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 17, end_line: 23}
+    summary: Update milestone completion and raw-message retention status.
+    rationale: Align the audit with shipped planner behavior.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 771, end_line: 774}
+    summary: Mark existing dependency and structural edge-case coverage.
+    rationale: Avoid presenting verified tests as remaining work.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 797, end_line: 812}
+    summary: Reconcile milestone and provider-cost status.
+    rationale: Separate implemented telemetry from remaining semantic work.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 819, end_line: 824}
+    summary: Specify minimal metadata for future run measurement.
+    rationale: Keep raw prompts and answers outside planning telemetry.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 466, end_line: 466}
+    summary: Require provider-call usage records in new telemetry entries.
+    rationale: Store usage apart from question and batch totals.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 508, end_line: 508}
+    summary: Write planning-call telemetry schema v3.
+    rationale: Version provider usage fields.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 620, end_line: 622}
+    summary: Initialize provider-call and cost totals.
+    rationale: Summarize cost coverage separately from API call counts.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 679, end_line: 679}
+    summary: Accept v3 while retaining v1 and v2 journal readers.
+    rationale: Preserve compatibility with existing local planning journals.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 706, end_line: 727}
+    summary: Validate and aggregate provider usage records.
+    rationale: Preserve known subtotals and detect missing amounts and currencies.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 789, end_line: 810}
+    summary: Report provider-call totals and cost coverage status.
+    rationale: Make unknown, partial, complete, and mixed-currency totals explicit.
+  - path: packages/service/src/powdrr_service/decision_classifier.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Import thread-local storage for provider usage.
+    rationale: Isolate usage from concurrent decision requests.
+  - path: packages/service/src/powdrr_service/decision_classifier.py
+    type: modified
+    span: {start_line: 119, end_line: 129}
+    summary: Expose last provider usage through a thread-local property.
+    rationale: Preserve usage without cross-request races.
+  - path: packages/service/src/powdrr_service/decision_classifier.py
+    type: modified
+    span: {start_line: 148, end_line: 148}
+    summary: Clear stale usage before an individual decision call.
+    rationale: Avoid attributing old cost to a failed request.
+  - path: packages/service/src/powdrr_service/decision_classifier.py
+    type: modified
+    span: {start_line: 190, end_line: 190}
+    summary: Capture usage from individual decision responses.
+    rationale: Make provider-reported cost available to planning telemetry.
+  - path: packages/service/src/powdrr_service/decision_classifier.py
+    type: modified
+    span: {start_line: 238, end_line: 238}
+    summary: Clear stale usage before a native decision batch.
+    rationale: Avoid carrying usage forward after batch failures.
+  - path: packages/service/src/powdrr_service/decision_classifier.py
+    type: modified
+    span: {start_line: 266, end_line: 266}
+    summary: Preserve usage from single-item and multi-item decision batches.
+    rationale: Expose aggregate provider usage once for the batch.
+  - path: packages/service/src/powdrr_service/decision_classifier.py
+    type: modified
+    span: {start_line: 272, end_line: 272}
+    summary: Preserve usage from single-item and multi-item decision batches.
+    rationale: Expose aggregate provider usage once for the batch.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 342, end_line: 342}
+    summary: Add provider-call records to question telemetry.
+    rationale: Associate usage with each inference attempt.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 349, end_line: 349}
+    summary: Time each provider completion.
+    rationale: Retain per-call latency with usage.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 363, end_line: 365}
+    summary: Record failed completions without reported cost.
+    rationale: Count failures without presenting them as free calls.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 370, end_line: 371}
+    summary: Exclude seeded batch answers from provider-call records.
+    rationale: Avoid counting accepted member answers as network calls.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 373, end_line: 380}
+    summary: Normalize provider-reported token and cost values.
+    rationale: Record supplied usage without estimating prices.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 390, end_line: 400}
+    summary: Append normalized usage for each completion.
+    rationale: Make individual provider calls attributable in local summaries.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1054, end_line: 1054}
+    summary: Include provider-call records in regular question telemetry.
+    rationale: Persist usage with question identity and gate context.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1091, end_line: 1095}
+    summary: Forward provider usage through seeded-batch correction handling.
+    rationale: Capture usage from follow-up completions.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1100, end_line: 1100}
+    summary: Distinguish seeded answers from later provider calls.
+    rationale: Keep batch answers distinct from actual completion requests.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1102, end_line: 1102}
+    summary: Distinguish seeded answers from later provider calls.
+    rationale: Keep batch answers distinct from actual completion requests.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1138, end_line: 1138}
+    summary: Prepare one usage record for a native batch.
+    rationale: Attribute aggregate usage at the batch level.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1155, end_line: 1158}
+    summary: Capture batch usage and elapsed time after the provider returns.
+    rationale: Report failed and successful batch invocations.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1237, end_line: 1238}
+    summary: Attach batch usage only to the first batch telemetry record.
+    rationale: Prevent double counting across member questions.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1256, end_line: 1281}
+    summary: Normalize optional provider usage into privacy-safe telemetry fields.
+    rationale: Avoid persisting raw prompts, responses, or opaque usage objects.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 887, end_line: 895}
+    summary: Add usage metadata to large-run fixtures.
+    rationale: Exercise partial provider-reported cost totals.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 933, end_line: 940}
+    summary: Assert subtotal and missing-cost call counts.
+    rationale: Keep partial cost coverage explicit.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 966, end_line: 984}
+    summary: Verify v2 records remain readable without provider-call fields.
+    rationale: Preserve compatibility with existing local journals.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 548, end_line: 550}
+    summary: Add usage storage to the decision-provider fixture.
+    rationale: Test native batch usage capture.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 567, end_line: 572}
+    summary: Return provider-reported usage from decision batches.
+    rationale: Exercise captured batch cost metadata.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 616, end_line: 622}
+    summary: Assert usage is counted once per batch.
+    rationale: Prevent duplicate cost attribution across member questions.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1194, end_line: 1194}
+    summary: Add usage storage to the concurrent question fixture.
+    rationale: Verify token and cost capture on concurrent calls.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1206, end_line: 1211}
+    summary: Return provider-reported usage from concurrent completions.
+    rationale: Exercise normalized usage values.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1260, end_line: 1275}
+    summary: Assert concurrent completion records retain provider usage.
+    rationale: Verify telemetry remains associated with provider calls.
+entities: []
+entity_relationships: []
+invariants:
+  - id: planner-cost-is-provider-reported
+    action: added
+    description: Planning telemetry records cost only when the provider reports a numeric amount and currency; it never estimates cost from model pricing.
+  - id: planner-batch-usage-is-counted-once
+    action: added
+    description: A native provider batch contributes one usage record associated with the batch, not one copied record per question member.
+  - id: planner-raw-messages-are-not-retained
+    action: added
+    description: Planning usage telemetry does not persist exact prompts or responses.
+guidance: []
+features: []
+proposed_prs: []

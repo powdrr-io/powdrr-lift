@@ -545,6 +545,9 @@ def test_dependency_candidate_reviews_use_jev_and_checkpoint_provider(
         batch_calls = 0
         max_batch_size = 2
 
+        def __init__(self) -> None:
+            self.last_usage: Mapping[str, Any] = {}
+
         def complete_json(
             self,
             messages: list[dict[str, str]],
@@ -561,6 +564,12 @@ def test_dependency_candidate_reviews_use_jev_and_checkpoint_provider(
         ) -> list[dict[str, Any]]:
             self.calls += 1
             self.batch_calls += 1
+            self.last_usage = {
+                "prompt_tokens": 20 * len(requests),
+                "completion_tokens": 5 * len(requests),
+                "cost_amount": 0.01 * len(requests),
+                "cost_currency": "USD",
+            }
             assert all(
                 schema["properties"][answer_key]["type"] == "boolean"
                 for _messages, schema in requests
@@ -604,6 +613,13 @@ def test_dependency_candidate_reviews_use_jev_and_checkpoint_provider(
     assert len(metrics) == 3
     assert {metric["provider"] for metric in metrics} == {"JEV"}
     assert sum(int(metric["api_calls"]) for metric in metrics) == 2
+    provider_calls = [
+        provider_call
+        for metric in metrics
+        for provider_call in metric["provider_calls"]
+    ]
+    assert len(provider_calls) == 2
+    assert sum(float(call["cost_amount"]) for call in provider_calls) == 0.03
     assert sorted(int(metric["batch_member_count"]) for metric in metrics) == [1, 2, 2]
     contexts = [context for metric in metrics for context in metric["question_context"]]
     assert len(contexts) == 3
@@ -1175,6 +1191,7 @@ def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() ->
             self.barrier = Barrier(2, timeout=3)
             self.lock = Lock()
             self.calls = 0
+            self.last_usage: Mapping[str, Any] = {}
 
         def complete_json(
             self,
@@ -1186,6 +1203,12 @@ def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() ->
             self.barrier.wait()
             with self.lock:
                 self.calls += 1
+            self.last_usage = {
+                "prompt_tokens": 12,
+                "completion_tokens": 8,
+                "cost_amount": 0.004,
+                "cost_currency": "USD",
+            }
             return {
                 "records": [{"statement": "An obligation."}],
                 "has_more": False,
@@ -1234,8 +1257,22 @@ def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() ->
     assert len(telemetry) == 4
     assert all(metric["provider"] == "test-provider" for metric in telemetry)
     assert all(metric["api_calls"] == 1 for metric in telemetry)
-    assert all(metric["prompt_tokens"] is None for metric in telemetry)
-    assert all(metric["completion_tokens"] is None for metric in telemetry)
+    assert all(metric["prompt_tokens"] == 12 for metric in telemetry)
+    assert all(metric["completion_tokens"] == 8 for metric in telemetry)
+    assert all(
+        metric["provider_calls"]
+        == [
+            {
+                "outcome": "accepted",
+                "elapsed_ms": metric["provider_calls"][0]["elapsed_ms"],
+                "prompt_tokens": 12,
+                "completion_tokens": 8,
+                "cost_amount": 0.004,
+                "cost_currency": "USD",
+            }
+        ]
+        for metric in telemetry
+    )
     assert all(metric["request_chars"] > 0 for metric in telemetry)
 
 

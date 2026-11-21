@@ -463,6 +463,7 @@ class LocalPlanningTelemetryStore:
             "prompt_tokens",
             "completion_tokens",
             "pagination",
+            "provider_calls",
         }
     )
 
@@ -504,7 +505,7 @@ class LocalPlanningTelemetryStore:
         if set(metric) != self._RECORD_FIELDS:
             raise PlanningJournalError("planning telemetry fields are malformed")
         record = {
-            "schema": "planning-call-telemetry-v2",
+            "schema": "planning-call-telemetry-v3",
             "session_id": self.session_id,
             "run_id": run_id,
             **metric,
@@ -616,6 +617,9 @@ class LocalPlanningTelemetryStore:
         total_questions = total_batches = total_calls = 0
         total_elapsed = 0.0
         tokens_known = True
+        provider_call_count = 0
+        cost_records: list[tuple[float, str]] = []
+        cost_unknown_count = 0
         if self.path.is_file():
             with self.path.open("r", encoding="utf-8") as stream:
                 for line in stream:
@@ -672,6 +676,7 @@ class LocalPlanningTelemetryStore:
                     if record.get("schema") not in {
                         "planning-call-telemetry-v1",
                         "planning-call-telemetry-v2",
+                        "planning-call-telemetry-v3",
                     }:
                         raise PlanningJournalError("planning telemetry is malformed")
                     run_id = record.get("run_id")
@@ -698,6 +703,28 @@ class LocalPlanningTelemetryStore:
                     total_batches += 1
                     total_calls += calls
                     total_elapsed += elapsed
+                    provider_calls = record.get("provider_calls", [])
+                    if not isinstance(provider_calls, list):
+                        raise PlanningJournalError(
+                            "provider usage telemetry is malformed"
+                        )
+                    provider_call_count += len(provider_calls)
+                    for provider_call in provider_calls:
+                        if not isinstance(provider_call, Mapping):
+                            raise PlanningJournalError(
+                                "provider usage telemetry is malformed"
+                            )
+                        amount = provider_call.get("cost_amount")
+                        currency = provider_call.get("cost_currency")
+                        if (
+                            isinstance(amount, (int, float))
+                            and not isinstance(amount, bool)
+                            and isinstance(currency, str)
+                            and currency
+                        ):
+                            cost_records.append((float(amount), currency))
+                        else:
+                            cost_unknown_count += 1
                     runs[run_id]["questions"] += count
                     runs[run_id]["batches"] += 1
                     runs[run_id]["api_calls"] += calls
@@ -759,6 +786,28 @@ class LocalPlanningTelemetryStore:
             "api_calls": total_calls,
             "elapsed_ms": round(total_elapsed, 3),
             "token_usage_known": tokens_known,
+            "provider_calls": provider_call_count,
+            "reported_cost": {
+                "status": (
+                    "unknown"
+                    if not cost_records
+                    else "mixed_currency"
+                    if len({currency for _, currency in cost_records}) > 1
+                    else "complete"
+                    if cost_unknown_count == 0
+                    and provider_call_count == len(cost_records)
+                    else "partial"
+                ),
+                "known_subtotal": round(sum(amount for amount, _ in cost_records), 8)
+                if cost_records
+                else None,
+                "currency": next(iter({currency for _, currency in cost_records}))
+                if len({currency for _, currency in cost_records}) == 1
+                else None,
+                "reported_calls": len(cost_records),
+                "unreported_calls": cost_unknown_count
+                + max(0, total_calls - provider_call_count),
+            },
             "by_question_kind": {
                 kind: dict(values) for kind, values in sorted(by_kind.items())
             },

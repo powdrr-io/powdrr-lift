@@ -337,27 +337,29 @@ and deterministic evidence digests. It rejects unpassed receipts and receipts
 whose source or candidate commit differs from the pin. Manifest intake also
 rejects unpassed receipts, preventing them from being cited by the semantic
 coverage path as complete. The `publish-execution-receipts` producer command
-joins persisted verifier evidence to explicit requirement ID/digest bindings,
-checks the candidate tree and exact checkout commit, and rejects duplicate or
-incomplete bindings. A reusable GitHub Actions workflow at
-`.github/workflows/publish-requirement-execution-receipts.yml` downloads that
-input from the same workflow run and uploads the named receipt artifact. The
-target repository's verifier job supplies `receipt-input.json` from its pinned
-execution plan and observed verifier records. Issue-worker Structrr diff
-artifacts now preserve each planned test case's stable ID, selectors, and exact
-requirement ID/digest bindings so a target job can join those inputs
-deterministically; the producer does not infer links from test names or intent
-references. See
+joins the verifier runner's indexed, persisted evidence with committed
+Structrr test-case bindings by exact selector equality, checks the candidate
+tree and exact checkout commit, and rejects malformed or contradictory
+identities. Requirements with missing, ambiguous, or failed verifier results
+are omitted so semantic coverage remains available. A reusable GitHub Actions
+workflow at `.github/workflows/publish-requirement-execution-receipts.yml`
+downloads verifier evidence from the same workflow run and uploads the named
+receipt artifact. Issue-worker Structrr diff artifacts preserve each planned
+test case's stable ID, selectors, and exact requirement ID/digest bindings; the
+producer does not infer links from test names or intent references. See
 `docs/guides/requirement-execution-receipts.md` for the caller contract.
 `plan` and `plan-resume` now discover the named
 `powdrr-requirement-execution-receipts` artifact from completed successful
 GitHub Actions runs for the exact pinned commit. An explicit JSON manifest path
 can override discovery. The loader pins the manifest base commit, validates each
 receipt and evidence digest, and supplies records only under explicit
-requirement IDs. The reusable workflow provides the production artifact
-publication path. Each target repository must supply its verifier's structured
-evidence and the exact bindings from its pinned execution plan; Powdrr does not
-yet ship a target-specific verifier job that creates that input artifact.
+requirement IDs. The reusable workflow provides the publication path when a
+target repository uploads the artifact directory emitted by
+`VerificationEvidenceRunner` as `powdrr-verification-evidence`. The artifact
+contains the run index and per-obligation evidence records, so target jobs do
+not need to create an intermediate receipt-input JSON file. Powdrr still does
+not ship a target-specific verifier job; each repository chooses and runs its
+own verification providers.
 Missing artifacts or unavailable discovery leave the normal semantic coverage
 path in place; they are not evidence of missing behavior.
 Planner-generated workflow descriptors now carry the exact requirement IDs and

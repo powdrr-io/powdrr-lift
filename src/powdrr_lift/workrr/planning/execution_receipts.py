@@ -8,7 +8,9 @@ import subprocess
 import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
+import yaml
 from powdrr_service.planning.evidence import Evidence, EvidenceError
 from powdrr_service.verification.requirement_execution import (
     RequirementExecutionReceipt,
@@ -17,6 +19,7 @@ from powdrr_service.verification.requirement_execution import (
 
 MANIFEST_SCHEMA = "requirement-execution-evidence-manifest-v1"
 RECEIPT_ARTIFACT_NAME = "powdrr-requirement-execution-receipts"
+VERIFICATION_RUN_SCHEMA = "verification-evidence-run-v1"
 
 
 def load_requirement_execution_receipts(
@@ -289,6 +292,271 @@ def produce_requirement_execution_receipt_manifest(
     )
 
 
+def produce_receipts_from_verification_run(
+    directory: Path,
+    *,
+    repository_root: Path,
+    verification_artifact_root: Path,
+    pinned_commit: str,
+    run_id: str,
+    expected_candidate_tree: str,
+) -> Path:
+    """Build receipts from persisted verifier output and committed case bindings.
+
+    Requirement linkage comes only from committed Structrr test-case records;
+    observed verifier obligations are joined by exact selector equality.
+    Requirements with missing, ambiguous, or non-passing selector evidence are
+    omitted so planning can use semantic coverage instead.
+    """
+    from powdrr_service.verification.requirement_execution import (
+        RequirementExecutionReceipt,
+    )
+
+    run_path = verification_artifact_root / "verification-run.json"
+    try:
+        run_data = json.loads(run_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise EvidenceError(
+            f"could not read verification run index: {error}"
+        ) from error
+    if not isinstance(run_data, Mapping) or set(run_data) != {
+        "schema_version",
+        "candidate_tree",
+        "obligations",
+        "evidence_files",
+    }:
+        raise EvidenceError("verification run index fields are invalid")
+    if run_data.get("schema_version") != VERIFICATION_RUN_SCHEMA:
+        raise EvidenceError("unsupported verification run index schema")
+    candidate_tree = run_data.get("candidate_tree")
+    if not isinstance(candidate_tree, str) or not candidate_tree:
+        raise EvidenceError("verification run index has no candidate tree")
+    if candidate_tree != expected_candidate_tree:
+        raise EvidenceError("verification run uses a different candidate tree")
+    obligations = run_data.get("obligations")
+    evidence_files = run_data.get("evidence_files")
+    if not isinstance(obligations, list) or not all(
+        isinstance(item, Mapping) for item in obligations
+    ):
+        raise EvidenceError("verification run obligations must be objects")
+    if not isinstance(evidence_files, list) or not all(
+        isinstance(item, Mapping) for item in evidence_files
+    ):
+        raise EvidenceError("verification run evidence files must be objects")
+
+    obligations_by_id: dict[str, Mapping[str, object]] = {}
+    for obligation in obligations:
+        obligation_id = obligation.get("obligation_id")
+        if not isinstance(obligation_id, str) or not obligation_id:
+            raise EvidenceError("verification obligation has no stable ID")
+        if obligation_id in obligations_by_id:
+            raise EvidenceError("verification obligation IDs must be unique")
+        obligations_by_id[obligation_id] = obligation
+    evidence_by_id: dict[str, Mapping[str, object]] = {}
+    refs_by_id: dict[str, str] = {}
+    for entry in evidence_files:
+        obligation_id, relative_path = entry.get("obligation_id"), entry.get("path")
+        if (
+            not isinstance(obligation_id, str)
+            or obligation_id not in obligations_by_id
+            or not isinstance(relative_path, str)
+            or not relative_path
+            or Path(relative_path).is_absolute()
+            or ".." in Path(relative_path).parts
+        ):
+            raise EvidenceError("verification evidence file reference is invalid")
+        expected_path = f"{obligation_id.removeprefix('sha256:')}/evidence.json"
+        if relative_path != expected_path:
+            raise EvidenceError(
+                "verification evidence path does not match its obligation"
+            )
+        if obligation_id in evidence_by_id:
+            raise EvidenceError("verification evidence obligation IDs must be unique")
+        evidence_path = (verification_artifact_root / relative_path).resolve()
+        try:
+            evidence_path.relative_to(verification_artifact_root.resolve())
+        except ValueError as error:
+            raise EvidenceError(
+                "verification evidence path escapes its artifact"
+            ) from error
+        try:
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise EvidenceError(
+                f"could not read verification evidence: {error}"
+            ) from error
+        if not isinstance(evidence, Mapping):
+            raise EvidenceError("verification evidence must be an object")
+        if evidence.get("obligation_id") != obligation_id:
+            raise EvidenceError("verification evidence does not match its index")
+        if evidence.get("candidate_tree") != candidate_tree:
+            raise EvidenceError("verification evidence has a different candidate tree")
+        evidence_by_id[obligation_id] = evidence
+        refs_by_id[obligation_id] = relative_path
+    if set(evidence_by_id) != set(obligations_by_id):
+        raise EvidenceError(
+            "verification run does not contain evidence for every obligation"
+        )
+
+    requirement_cases: dict[str, dict[str, Any]] = {}
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "--", "*structrr-diff.yaml"],
+        cwd=repository_root,
+        capture_output=True,
+        check=True,
+    ).stdout
+    for raw_path in tracked.split(b"\0"):
+        if not raw_path:
+            continue
+        plan_path = repository_root / raw_path.decode("utf-8")
+        try:
+            document = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as error:
+            raise EvidenceError(
+                f"could not read committed test bindings: {error}"
+            ) from error
+        if not isinstance(document, Mapping):
+            continue
+        verification = document.get("verification")
+        cases = (
+            verification.get("required_test_cases")
+            if isinstance(verification, Mapping)
+            else None
+        )
+        if not isinstance(cases, list):
+            continue
+        for case in cases:
+            if not isinstance(case, Mapping):
+                raise EvidenceError("committed required test case must be an object")
+            selectors = case.get("selectors")
+            bindings = case.get("requirement_bindings")
+            if bindings is None:
+                continue
+            if not isinstance(bindings, list):
+                raise EvidenceError("committed requirement bindings must be a list")
+            if (
+                not isinstance(selectors, list)
+                or not all(
+                    isinstance(selector, str) and selector for selector in selectors
+                )
+                or not selectors
+            ):
+                raise EvidenceError("bound committed test case has invalid selectors")
+            for binding in bindings:
+                if not isinstance(binding, Mapping):
+                    raise EvidenceError(
+                        "committed requirement binding must be an object"
+                    )
+                requirement_id = binding.get("requirement_id")
+                digest = binding.get("requirement_digest")
+                if not isinstance(requirement_id, str) or not requirement_id:
+                    raise EvidenceError(
+                        "committed requirement binding has no stable ID"
+                    )
+                if not isinstance(digest, str) or not digest:
+                    raise EvidenceError("committed requirement binding has no digest")
+                aggregate = requirement_cases.setdefault(
+                    requirement_id,
+                    {"digest": digest, "selectors": set(), "bindings": []},
+                )
+                if aggregate["digest"] != digest:
+                    raise EvidenceError(
+                        "conflicting committed digests for requirement "
+                        f"{requirement_id}"
+                    )
+                aggregate["selectors"].update(selectors)
+                aggregate["bindings"].append(
+                    {"selectors": sorted(set(selectors)), "case_id": case.get("id")}
+                )
+
+    receipts: list[RequirementExecutionReceipt] = []
+    for requirement_id, aggregate in sorted(requirement_cases.items()):
+        selectors = aggregate["selectors"]
+        assert isinstance(selectors, set)
+        matched: list[tuple[str, Mapping[str, object], Mapping[str, object]]] = []
+        complete = True
+        for selector in sorted(selectors):
+            matches = [
+                obligation_id
+                for obligation_id, obligation in obligations_by_id.items()
+                if obligation.get("selector") == selector
+            ]
+            if len(matches) != 1:
+                complete = False
+                break
+            obligation_id = matches[0]
+            evidence = evidence_by_id[obligation_id]
+            if evidence.get("status") != "passed":
+                complete = False
+                break
+            obligation = obligations_by_id[obligation_id]
+            for field in (
+                "contract_id",
+                "provider",
+                "selector",
+                "profile",
+                "contract_fingerprint",
+                "verifier_fingerprint",
+            ):
+                if evidence.get(field) != obligation.get(field):
+                    raise EvidenceError(f"verification evidence has mismatched {field}")
+            matched.append((obligation_id, obligation, evidence))
+        if not complete or not matched:
+            continue
+        rows: list[dict[str, Any]] = [
+            {
+                "obligation": dict(obligation),
+                "evidence": dict(evidence),
+                "evidence_path": refs_by_id[obligation_id],
+            }
+            for obligation_id, obligation, evidence in matched
+        ]
+        rows.sort(key=lambda item: str(item["obligation"].get("selector", "")))
+        oracle_payload = {"schema": "powdrr-requirement-oracle-v1", "rows": rows}
+        oracle_digest = (
+            "sha256:" + hashlib.sha256(_canonical_json(oracle_payload)).hexdigest()
+        )
+        oracle_id = "oracle:" + oracle_digest.removeprefix("sha256:")
+        command_payload = [row["evidence"].get("command_fingerprint") for row in rows]
+        if any(
+            not isinstance(item, str) or not item.startswith("sha256:")
+            for item in command_payload
+        ):
+            raise EvidenceError(
+                "verification evidence has an invalid command fingerprint"
+            )
+        command_digest = (
+            "sha256:" + hashlib.sha256(_canonical_json(command_payload)).hexdigest()
+        )
+        artifact_refs = [
+            f"artifact:run/{run_id}/verification-evidence/{refs_by_id[obligation_id]}"
+            for obligation_id, _obligation, _evidence in matched
+        ]
+        receipts.append(
+            RequirementExecutionReceipt.observed(
+                requirement_id=requirement_id,
+                requirement_digest=str(aggregate["digest"]),
+                source_commit=pinned_commit,
+                candidate_commit=pinned_commit,
+                oracle_id=oracle_id,
+                oracle_digest=oracle_digest,
+                command_digest=command_digest,
+                outcome="passed",
+                run_id=f"github:run/{run_id}",
+                artifact_refs=artifact_refs,
+            )
+        )
+    return write_requirement_execution_receipt_manifest(
+        directory, pinned_commit=pinned_commit, receipts=receipts
+    )
+
+
+def _canonical_json(value: object) -> bytes:
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+
+
 def discover_requirement_execution_receipts(
     repository: str,
     *,
@@ -403,5 +671,6 @@ __all__ = [
     "discover_requirement_execution_receipts",
     "load_requirement_execution_receipts",
     "produce_requirement_execution_receipt_manifest",
+    "produce_receipts_from_verification_run",
     "write_requirement_execution_receipt_manifest",
 ]

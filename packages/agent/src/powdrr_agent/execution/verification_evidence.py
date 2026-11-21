@@ -20,6 +20,8 @@ from powdrr_agent.execution.verification_provider import (
     VerificationProviderRequest,
 )
 
+VERIFICATION_EVIDENCE_RUN_SCHEMA = "verification-evidence-run-v1"
+
 
 class VerificationObligationLike(Protocol):
     """Service-authored obligation fields consumed by the local runner."""
@@ -47,6 +49,8 @@ class VerificationObligationLike(Protocol):
 
     @property
     def verifier_fingerprint(self) -> str: ...
+
+    def to_data(self) -> dict[str, Any]: ...
 
 
 ProgressCallback = Callable[[Mapping[str, Any]], None]
@@ -76,6 +80,12 @@ class VerificationEvidenceRunner:
         inventory: Sequence[Mapping[str, Any]],
     ) -> tuple[VerificationEvidence, ...]:
         artifact_root.mkdir(parents=True, exist_ok=True)
+        obligation_data = [obligation.to_data() for obligation in obligations]
+        obligation_ids = [
+            str(item.get("obligation_id", "")) for item in obligation_data
+        ]
+        if not all(obligation_ids) or len(set(obligation_ids)) != len(obligation_ids):
+            raise ValueError("verification obligation IDs must be non-empty and unique")
         inventory_by_key = {
             (
                 str(item.get("provider", "")),
@@ -160,6 +170,29 @@ class VerificationEvidenceRunner:
             )
             results.append(evidence)
             self._emit("verification_finished", obligation, evidence=evidence)
+        (artifact_root / "verification-run.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": VERIFICATION_EVIDENCE_RUN_SCHEMA,
+                    "candidate_tree": candidate_tree,
+                    "obligations": obligation_data,
+                    "evidence_files": [
+                        {
+                            "obligation_id": item.obligation_id,
+                            "path": (
+                                f"{item.obligation_id.removeprefix('sha256:')}"
+                                "/evidence.json"
+                            ),
+                        }
+                        for item in obligations
+                    ],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         return tuple(results)
 
     def _persist(
@@ -268,6 +301,7 @@ def _fingerprint(value: object) -> str:
 
 
 __all__ = [
+    "VERIFICATION_EVIDENCE_RUN_SCHEMA",
     "VerificationObligationLike",
     "VerificationEvidenceRunner",
 ]

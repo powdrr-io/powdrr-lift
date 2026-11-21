@@ -52,6 +52,7 @@ from powdrr_service.ci_response import (
     render_ci_observation_checkpoint,
     render_stale_ci_observation_checkpoint,
 )
+from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.evaluations.deepswe_design_evaluation import (
     DEFAULT_STATE_DATA_RUBRIC,
     DeepSWEEvaluationError,
@@ -271,7 +272,7 @@ from powdrr_lift.workrr.human_task import (
 )
 from powdrr_lift.workrr.local_model import download_local_qwen_model
 from powdrr_lift.workrr.planning.execution_receipts import (
-    produce_requirement_execution_receipt_manifest,
+    produce_receipts_from_verification_run,
 )
 from powdrr_lift.workrr.planning_session import (
     PlanningSessionConfig,
@@ -396,12 +397,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     receipt_producer_parser = subparsers.add_parser(
         "publish-execution-receipts",
-        help=(
-            "Publish pinned requirement receipts from a GitHub Actions verifier "
-            "evidence input artifact."
-        ),
+        help=("Publish pinned requirement receipts from persisted verifier evidence."),
     )
-    receipt_producer_parser.add_argument("--input", type=Path, required=True)
+    receipt_producer_parser.add_argument(
+        "--verification-artifact-dir", type=Path, required=True
+    )
     receipt_producer_parser.add_argument("--output", type=Path, required=True)
     receipt_producer_parser.add_argument("--pinned-commit", required=True)
     receipt_producer_parser.add_argument("--run-id", required=True)
@@ -2803,57 +2803,30 @@ def _run_publish_execution_receipts(args: argparse.Namespace) -> int:
         ).stdout.strip()
         if head != args.pinned_commit:
             raise ValueError("checkout HEAD does not match --pinned-commit")
-        raw = json.loads(args.input.read_text(encoding="utf-8"))
-        expected_fields = {
-            "schema_version",
-            "candidate_tree",
-            "obligations",
-            "evidence",
-            "requirement_bindings",
-            "evidence_artifact_refs",
-        }
-        if not isinstance(raw, Mapping) or set(raw) != expected_fields:
-            raise ValueError("receipt producer input fields are invalid")
-        if raw.get("schema_version") != "verification-receipt-input-v1":
-            raise ValueError("unsupported receipt producer input schema")
-        candidate_tree = raw.get("candidate_tree")
-        obligations = raw.get("obligations")
-        evidence = raw.get("evidence")
-        requirement_bindings = raw.get("requirement_bindings")
-        artifact_refs = raw.get("evidence_artifact_refs")
-        if not isinstance(candidate_tree, str) or not candidate_tree.strip():
-            raise ValueError("receipt producer input has no candidate tree")
-        if not isinstance(obligations, list) or not all(
-            isinstance(item, Mapping) for item in obligations
-        ):
-            raise ValueError("receipt producer obligations must be objects")
-        if not isinstance(evidence, list) or not all(
-            isinstance(item, Mapping) for item in evidence
-        ):
-            raise ValueError("receipt producer evidence must be objects")
-        if not isinstance(requirement_bindings, Mapping) or not all(
-            isinstance(key, str)
-            and isinstance(value, list)
-            and all(isinstance(binding, Mapping) for binding in value)
-            for key, value in requirement_bindings.items()
-        ):
-            raise ValueError("receipt producer requirement bindings are invalid")
-        if not isinstance(artifact_refs, Mapping) or not all(
-            isinstance(key, str) and isinstance(value, str)
-            for key, value in artifact_refs.items()
-        ):
-            raise ValueError(
-                "receipt producer evidence artifact references are invalid"
-            )
-        manifest_path = produce_requirement_execution_receipt_manifest(
+        diff = subprocess.run(
+            ["git", "diff", "--binary"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        candidate_tree = content_fingerprint(
+            {"head": head, "diff": diff, "status": status}
+        )
+        manifest_path = produce_receipts_from_verification_run(
             args.output,
+            repository_root=repo_root,
+            verification_artifact_root=args.verification_artifact_dir,
             pinned_commit=args.pinned_commit,
-            candidate_tree=candidate_tree,
-            run_id=f"github:run/{args.run_id}",
-            evidence_records=evidence,
-            obligations=obligations,
-            requirement_bindings=requirement_bindings,
-            evidence_artifact_refs=artifact_refs,
+            run_id=args.run_id,
+            expected_candidate_tree=candidate_tree,
         )
     except (
         OSError,

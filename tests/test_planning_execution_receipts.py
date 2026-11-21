@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.planning.evidence import EvidenceError
 from powdrr_service.verification.requirement_execution import (
     RequirementExecutionReceipt,
@@ -269,10 +271,36 @@ def test_verification_run_producer_rejects_candidate_tree_mismatch(
         )
 
 
-def test_publish_execution_receipts_cli_pins_checkout_and_parses_input(
+def test_publish_execution_receipts_cli_builds_from_committed_bindings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    commit = "a" * 40
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Powdrr",
+            "-c",
+            "user.email=powdrr@example.com",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    monkeypatch.setattr("powdrr_lift.cli.resolve_repo_root", lambda _path: repo)
+    monkeypatch.setattr("powdrr_lift.cli.subprocess.run", subprocess.run)
     obligation = {
         "obligation_id": "obligation:one",
         "contract_id": "contract:one",
@@ -290,7 +318,7 @@ def test_publish_execution_receipts_cli_pins_checkout_and_parses_input(
         "profile": obligation["profile"],
         "contract_fingerprint": obligation["contract_fingerprint"],
         "verifier_fingerprint": obligation["verifier_fingerprint"],
-        "candidate_tree": "tree:observed",
+        "candidate_tree": "",
         "command_fingerprint": "sha256:" + "d" * 64,
         "status": "passed",
         "artifact_refs": ["artifact:run/456/test-output.txt"],
@@ -299,48 +327,102 @@ def test_publish_execution_receipts_cli_pins_checkout_and_parses_input(
         "requirement_id": "req-0001",
         "requirement_digest": "sha256:" + "e" * 64,
     }
-    input_path = tmp_path / "receipt-input.json"
-    input_path.write_text(
+    plan_path = repo / "docs" / "structrr" / "diffs" / "demo" / "structrr-diff.yaml"
+    plan_path.parent.mkdir(parents=True)
+    plan_path.write_text(
+        "verification:\n  required_test_cases:\n"
+        "    - id: AC-01\n      selectors:\n"
+        "        - tests/test_example.py::test_behavior\n"
+        "      requirement_bindings:\n"
+        "        - requirement_id: req-0001\n"
+        f"          requirement_digest: {binding['requirement_digest']}\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "--", str(plan_path)], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Powdrr",
+            "-c",
+            "user.email=powdrr@example.com",
+            "commit",
+            "-qm",
+            "add bindings",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    candidate_tree = content_fingerprint(
+        {
+            "head": head,
+            "diff": subprocess.run(
+                ["git", "diff", "--binary"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout,
+            "status": subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout,
+        }
+    )
+    evidence["candidate_tree"] = candidate_tree
+    evidence_root = tmp_path / "verification-evidence"
+    evidence_dir = evidence_root / "obligation:one"
+    evidence_dir.mkdir(parents=True)
+    evidence_path = evidence_dir / "evidence.json"
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+    (evidence_root / "verification-run.json").write_text(
         json.dumps(
             {
-                "schema_version": "verification-receipt-input-v1",
-                "candidate_tree": "tree:observed",
+                "schema_version": "verification-evidence-run-v1",
+                "candidate_tree": candidate_tree,
                 "obligations": [obligation],
-                "evidence": [evidence],
-                "requirement_bindings": {obligation["obligation_id"]: [binding]},
-                "evidence_artifact_refs": {
-                    obligation["obligation_id"]: "artifact:run/456/evidence.json"
-                },
+                "evidence_files": [
+                    {
+                        "obligation_id": obligation["obligation_id"],
+                        "path": "obligation:one/evidence.json",
+                    }
+                ],
             }
         ),
         encoding="utf-8",
     )
     output_dir = tmp_path / "output"
-    monkeypatch.setattr(
-        "powdrr_lift.cli.subprocess.run",
-        lambda *_args, **_kwargs: SimpleNamespace(stdout=commit + "\n", returncode=0),
-    )
 
     args = build_parser().parse_args(
         [
             "publish-execution-receipts",
-            "--input",
-            str(input_path),
+            "--verification-artifact-dir",
+            str(evidence_root),
             "--output",
             str(output_dir),
             "--pinned-commit",
-            commit,
+            head,
             "--run-id",
             "456",
             "--repo-root",
-            str(tmp_path),
+            str(repo),
         ]
     )
 
     assert args.func(args) == 0
     manifest_path = output_dir / RECEIPT_ARTIFACT_NAME / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert manifest["base_commit"] == commit
+    assert manifest["base_commit"] == head
     assert manifest["receipts"][0]["receipt"]["run_id"] == "github:run/456"
 
 

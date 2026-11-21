@@ -1,0 +1,84 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1665
+title: Increase bounded batching for structural planning questions
+intent:
+  problem: Structural subject enumeration and change-description questions generate many independent provider calls in the planner's scale profile.
+  goal: Batch up to six independent structural questions under explicit combined input limits while retaining member schemas, parsing, and singleton replay for failed batches.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 25, end_line: 26}
+    summary: Define 48,000-character combined input limits for structural change and subject enumeration batches.
+    rationale: Permit measured six-member batches while bounding combined prompt size.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 36, end_line: 37}
+    summary: Export the structural batch input limits.
+    rationale: Make the safety bounds directly testable.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 238, end_line: 243}
+    summary: Allow up to six structural enumeration and change-description questions per batch.
+    rationale: Reduce calls for independent per-item structural work without increasing other question-family limits.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 413, end_line: 416}
+    summary: Apply separate combined input bounds to the two structural question families.
+    rationale: Keep structural batching bounded without changing any member's individual request limit.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1264, end_line: 1269}
+    summary: Permit and enforce the six-member structural batch ceiling in scale profiles.
+    rationale: Keep benchmark validation aligned with the structural request policy.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 24, end_line: 25}
+    summary: Import structural batch limit constants for contract coverage.
+    rationale: Verify both dedicated combined input bounds.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 449, end_line: 492}
+    summary: Verify six-member batching for structural descriptions and subject enumeration with per-member parsing.
+    rationale: Ensure the expanded batch policy preserves every member's identity and parser.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 136, end_line: 148}
+    summary: Assert Structrr-stress structural request counts, call counts, and batch limits.
+    rationale: Guard the measured call reduction alongside successful compilation and fixture invariants.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 743, end_line: 761}
+    summary: Record structural batching bounds and measured reductions across large and Structrr-stress profiles.
+    rationale: Keep the active planner-efficiency plan tied to benchmark evidence and its synthetic-only limitation.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 888, end_line: 903}
+    summary: Document structural request batching, replay guarantees, and the live semantic-evaluation gap.
+    rationale: Keep the LLM interaction audit aligned with the new request policy.
+entities:
+  - id: bounded-structrr-question-batching
+    type: Function
+    action: added
+  - id: structural-batch-call-count-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: structural-benchmark-protects-batching
+    type: verifies
+    source: structural-batch-call-count-regression
+    target: bounded-structrr-question-batching
+    action: added
+    description: The deterministic Structrr-stress benchmark verifies six-member batching and reduced structural calls while requiring successful compilation.
+invariants:
+  - id: structural-batches-preserve-member-contracts
+    description: Every structural batch member retains its original question identity, schema, parser, and 24,000-character individual input limit.
+    action: added
+  - id: structural-batch-input-is-bounded
+    description: Combined structural enumeration and description requests stay within their dedicated 48,000-character limits, with oversize groups split by the batcher.
+    action: added
+  - id: structural-synthetic-metrics-do-not-claim-live-quality
+    description: Deterministic profile call reductions do not establish semantic completeness for live structural decisions.
+    action: added
+guidance: []

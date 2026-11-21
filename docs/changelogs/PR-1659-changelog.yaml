@@ -9,43 +9,68 @@ structured_files: []
 files:
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 156, end_line: 156}
-    summary: Add per-scan storage for the repository default branch.
+    span: {start_line: 159, end_line: 159}
+    summary: Store repository default-branch evidence in the dependency scan cache.
     rationale: Reuse authoritative repository metadata when validating recovered PR targets.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 170, end_line: 174}
-    summary: Cache the repository default branch with dependency evidence for one worker scan.
+    span: {start_line: 173, end_line: 177}
+    summary: Cache the repository default branch and linked PR timeline observations.
     rationale: Avoid repeated repository metadata reads across dependency checks.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 816, end_line: 824}
+    span: {start_line: 828, end_line: 836}
     summary: Read the repository default branch through the GitHub client.
     rationale: Compare merged publication targets with the authoritative integration branch.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 5753, end_line: 5755}
-    summary: Pass expected work identity into merged-publication dependency recovery.
+    span: {start_line: 5880, end_line: 5882}
+    summary: Pass accepted contract identity into merged-publication dependency recovery.
     rationale: Evaluate publication against the accepted plan item and input contract.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 5767, end_line: 5769}
-    summary: Require the expected work-item identity and contract digest during publication recovery.
+    span: {start_line: 5894, end_line: 5896}
+    summary: Initialize candidate discovery for comment and issue-timeline PR links.
+    rationale: Preserve recovery when publication outlives the worker's issue comment.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 5878, end_line: 5878}
+    summary: Retain the recovered publication helper across the timeline recovery merge.
+    rationale: Keep both comment-based and timeline-based discovery under the same verifier.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 5905, end_line: 5919}
+    summary: Collect same-repository PR candidates from issue timeline cross-references.
+    rationale: Recover published effects when the issue marker or checkpoint write was interrupted.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 5921, end_line: 5931}
+    summary: Bind candidate verification to repository, issue, plan, item, and contract digest.
     rationale: Prevent legacy markers and old-contract PRs from releasing dependents.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 5787, end_line: 5801}
-    summary: Compare the PR's embedded identity and base branch with authoritative work and repository state.
-    rationale: Require an exact accepted contract and a merge target on the default branch.
+    span: {start_line: 5933, end_line: 5938}
+    summary: Require exact publication identity and a default-branch target.
+    rationale: Require the accepted contract to merge into the intended integration branch.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 5804, end_line: 5807}
-    summary: Bind issue-closing validation to the same recovered publication.
-    rationale: Preserve the issue-to-PR relation alongside contract checks.
+    span: {start_line: 5940, end_line: 5941}
+    summary: Verify the recovered PR still closes the expected issue.
+    rationale: Preserve the issue-to-PR relationship alongside contract checks.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 5818, end_line: 5832}
-    summary: Parse the deterministic work-item publication marker from a PR body.
+    span: {start_line: 5948, end_line: 5948}
+    summary: Validate the recovered merge commit identifier.
+    rationale: Reject incomplete merge evidence.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 5951, end_line: 5954}
+    summary: Retain only candidates that prove the expected contract and merge state.
+    rationale: Prevent ambiguous or stale PRs from satisfying dependencies.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 5964, end_line: 5980}
+    summary: Parse deterministic work-item identity from implementation PR descriptions.
     rationale: Reject missing or malformed identity evidence.
   - path: src/powdrr_lift/workrr/planned_workflow_task.py
     type: modified
@@ -74,69 +99,79 @@ files:
     rationale: Make identity available at the PR publication boundary.
   - path: src/powdrr_lift/workrr/task_agent.py
     type: modified
-    span: {start_line: 412, end_line: 412}
+    span: {start_line: 413, end_line: 413}
     summary: Add the worker-computed publication identity to task-agent configuration.
     rationale: Carry issue-worker ownership context into the task publication boundary.
   - path: src/powdrr_lift/workrr/task_agent.py
     type: modified
-    span: {start_line: 2993, end_line: 3067}
+    span: {start_line: 2994, end_line: 3068}
     summary: Add a deterministic work-item identity marker to implementation PR descriptions.
     rationale: Preserve accepted contract identity in GitHub evidence independently of worker checkpoints.
   - path: src/powdrr_lift/workrr/task_agent.py
     type: modified
-    span: {start_line: 4185, end_line: 4187}
+    span: {start_line: 4181, end_line: 4183}
     summary: Attach trusted work-item identity metadata during PR publication.
     rationale: Keep identity generation outside model-authored PR text.
   - path: src/powdrr_lift/workrr/task_agent.py
     type: modified
-    span: {start_line: 7576, end_line: 7585}
+    span: {start_line: 7572, end_line: 7581}
     summary: Inject the configured worker identity into the selected task context.
     rationale: Cover workflow-directory tasks as well as newly instantiated workflow files.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 595, end_line: 595}
+    span: {start_line: 672, end_line: 672}
     summary: Define the default branch used by dependency recovery tests.
     rationale: Exercise PR target validation against a known repository branch.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 629, end_line: 631}
+    span: {start_line: 710, end_line: 712}
     summary: Implement the fake client's default-branch lookup.
     rationale: Keep repository metadata observations deterministic in tests.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 891, end_line: 891}
+    span: {start_line: 1004, end_line: 1004}
     summary: Expand recovered dependency evidence cases to cover contract and target checks.
     rationale: Exercise failure modes at the dependency readiness boundary.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 893, end_line: 898}
+    span: {start_line: 1006, end_line: 1011}
     summary: Add cases for legacy evidence, changed contracts, and non-default targets.
     rationale: Prove incomplete or mismatched evidence cannot unlock dependents.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 904, end_line: 905}
+    span: {start_line: 1017, end_line: 1018}
     summary: Pass identity and target cases into the recovered dependency test.
     rationale: Keep each proof scenario explicit.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 930, end_line: 950}
+    span: {start_line: 1043, end_line: 1063}
     summary: Construct contract-bound publication metadata in recovery fixtures.
     rationale: Match the evidence format emitted by the worker.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 954, end_line: 955}
+    span: {start_line: 1067, end_line: 1068}
     summary: Include the PR's base branch in recovery fixtures.
     rationale: Exercise default-branch verification.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 992, end_line: 1004}
+    span: {start_line: 1105, end_line: 1121}
     summary: Bind the promotion scenario to the accepted contract identity.
     rationale: Verify valid merged publication still releases dependent work.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 1008, end_line: 1014}
+    span: {start_line: 1125, end_line: 1126}
     summary: Assert promotion from the contract-bound merged publication.
     rationale: Preserve the positive dependency recovery path.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 1242, end_line: 1254}
+    summary: Bind the timeline recovery success case to the exact accepted work identity.
+    rationale: Ensure timeline discovery and comment-marker recovery use the same proof.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 1258, end_line: 1264}
+    summary: Verify incomplete or ambiguous timeline evidence does not fulfill the dependency.
+    rationale: Keep unbound cross-references from releasing dependent work.
   - path: tests/test_workflow_task_agent.py
     type: modified
     span: {start_line: 76, end_line: 76}
@@ -144,7 +179,7 @@ files:
     rationale: Verify identity metadata is added at the agent publication boundary.
   - path: tests/test_workflow_task_agent.py
     type: modified
-    span: {start_line: 346, end_line: 377}
+    span: {start_line: 361, end_line: 392}
     summary: Verify the worker identity is serialized into PR body metadata without mutating the original action.
     rationale: Protect deterministic identity publication from model-authored text changes.
   - path: tests/test_planned_workflow_task.py

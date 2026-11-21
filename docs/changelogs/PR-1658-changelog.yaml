@@ -108,48 +108,48 @@ files:
 - path: src/powdrr_lift/workrr/github_issue_queue.py
   type: modified
   span:
-    start_line: 1064
-    end_line: 1076
+    start_line: 1118
+    end_line: 1130
   summary: Changed as part of Reconcile published PRs and changelog finalization.
   rationale: Make generated PR changelogs cover deletion-only diff hunks and reconcile
     already-published PRs before issue work can be retried.
 - path: src/powdrr_lift/workrr/github_issue_queue.py
   type: modified
   span:
-    start_line: 1078
-    end_line: 1078
+    start_line: 1132
+    end_line: 1132
   summary: Changed as part of Reconcile published PRs and changelog finalization.
   rationale: Make generated PR changelogs cover deletion-only diff hunks and reconcile
     already-published PRs before issue work can be retried.
 - path: src/powdrr_lift/workrr/github_issue_queue.py
   type: modified
   span:
-    start_line: 1469
-    end_line: 1512
+    start_line: 1523
+    end_line: 1566
   summary: Changed as part of Reconcile published PRs and changelog finalization.
   rationale: Make generated PR changelogs cover deletion-only diff hunks and reconcile
     already-published PRs before issue work can be retried.
 - path: src/powdrr_lift/workrr/github_issue_queue.py
   type: modified
   span:
-    start_line: 1939
-    end_line: 1970
+    start_line: 1993
+    end_line: 2024
   summary: Changed as part of Reconcile published PRs and changelog finalization.
   rationale: Make generated PR changelogs cover deletion-only diff hunks and reconcile
     already-published PRs before issue work can be retried.
 - path: src/powdrr_lift/workrr/github_issue_queue.py
   type: modified
   span:
-    start_line: 1977
-    end_line: 1977
+    start_line: 2031
+    end_line: 2031
   summary: Changed as part of Reconcile published PRs and changelog finalization.
   rationale: Make generated PR changelogs cover deletion-only diff hunks and reconcile
     already-published PRs before issue work can be retried.
 - path: src/powdrr_lift/workrr/github_issue_queue.py
   type: modified
   span:
-    start_line: 1985
-    end_line: 1987
+    start_line: 2039
+    end_line: 2041
   summary: Changed as part of Reconcile published PRs and changelog finalization.
   rationale: Make generated PR changelogs cover deletion-only diff hunks and reconcile
     already-published PRs before issue work can be retried.
@@ -204,16 +204,16 @@ files:
 - path: tests/test_github_issue_queue.py
   type: modified
   span:
-    start_line: 193
-    end_line: 269
+    start_line: 256
+    end_line: 332
   summary: Changed as part of Reconcile published PRs and changelog finalization.
   rationale: Make generated PR changelogs cover deletion-only diff hunks and reconcile
     already-published PRs before issue work can be retried.
 - path: tests/test_github_issue_queue.py
   type: modified
   span:
-    start_line: 734
-    end_line: 759
+    start_line: 797
+    end_line: 822
   summary: Changed as part of Reconcile published PRs and changelog finalization.
   rationale: Make generated PR changelogs cover deletion-only diff hunks and reconcile
     already-published PRs before issue work can be retried.

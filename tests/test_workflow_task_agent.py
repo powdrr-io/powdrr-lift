@@ -73,6 +73,7 @@ from powdrr_lift.workrr.task_agent import (
     _append_inline_plan_adjustments_to_pr_body,
     _append_issue_reference_to_pr_body,
     _append_plan_repair_metadata_to_pr_body,
+    _append_work_item_identity_to_pr_body,
     _apply_task_edits,
     _build_workflow_client,
     _durable_task_action_output_state,
@@ -355,6 +356,38 @@ def test_clean_publication_issue_reference_is_added_to_rendered_description() ->
 
     rendered = render_standard_pr_description(updated_sections)
     assert "Closes #917" in rendered
+
+
+def test_worker_publication_identity_is_added_to_pr_body() -> None:
+    identity = {
+        "schema": "powdrr-work-item-publication-v1",
+        "repository": "example/project",
+        "issue_number": 917,
+        "plan_id": "feature-v1",
+        "item_id": "base",
+        "input_contract_digest": "sha256:" + "a" * 64,
+        "purpose": "implementation",
+    }
+    action = WorkflowAction(
+        kind="invoke_tool",
+        tool="gh",
+        parameters={"operation": "pr_create", "body": "Implement the work."},
+    )
+
+    updated = _append_work_item_identity_to_pr_body(
+        action,
+        task_input_state={"proposed_pr_context": {"work_item_identity": identity}},
+    )
+
+    assert (
+        json.loads(
+            updated.parameters["body"]
+            .split("powdrr-work-item-publication:v1 ", 1)[1]
+            .split(" -->", 1)[0]
+        )
+        == identity
+    )
+    assert action.parameters["body"] == "Implement the work."
 
 
 def test_plan_amendment_pr_body_includes_typed_repair_manifest(

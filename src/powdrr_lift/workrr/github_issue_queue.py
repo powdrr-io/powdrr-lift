@@ -156,6 +156,7 @@ class _DependencyEvidenceCache:
     dependency_results: dict[tuple[str, str, int | None], bool] = dataclass_field(
         default_factory=dict
     )
+    repository_default_branch: str | None = None
 
     def comments(
         self, client: GitHubIssueClient, issue_number: int
@@ -168,6 +169,11 @@ class _DependencyEvidenceCache:
         if number not in self.pull_requests_by_number:
             self.pull_requests_by_number[number] = client.pull_request(number)
         return self.pull_requests_by_number[number]
+
+    def default_branch(self, client: GitHubIssueClient) -> str:
+        if self.repository_default_branch is None:
+            self.repository_default_branch = client.default_branch()
+        return self.repository_default_branch
 
     def linked_pull_requests(
         self, client: GitHubIssueClient, issue_number: int
@@ -818,6 +824,15 @@ class GitHubIssueClient:
                 "plan commit is not reachable from the repository default branch; "
                 "publish only after the plan review PR merges"
             )
+
+    def default_branch(self) -> str:
+        repository = _json_mapping(
+            self._api("GET", f"repos/{self.repository}").stdout, "repository"
+        )
+        branch = repository.get("default_branch")
+        if not isinstance(branch, str) or not branch:
+            raise GitHubIssueQueueError("GitHub did not return the default branch name")
+        return branch
 
     def default_branch_required_checks(self) -> tuple[str, ...] | None:
         """Return required checks, or None when GitHub hides policy on this plan."""
@@ -5862,6 +5877,9 @@ def _dependency_is_fulfilled(
         current,
         comments,
         client=client,
+        plan_id=plan.plan_id,
+        dependency_id=dependency_id,
+        input_contract_digest=expected_digest,
         evidence_cache=evidence_cache,
     ):
         return remember(True)
@@ -5873,48 +5891,67 @@ def _dependency_has_merged_publication(
     comments: Sequence[Mapping[str, Any]],
     *,
     client: GitHubIssueClient,
+    plan_id: str,
+    dependency_id: str,
+    input_contract_digest: str,
     evidence_cache: _DependencyEvidenceCache | None,
 ) -> bool:
-    """Recover dependency completion when PR publication outlived its task run."""
     pull_request_url = _latest_published_pr_url_from_issue_comments(
         comments, issue_number=issue.number
     )
     pull_request_number = _same_repository_pull_request_number(
         pull_request_url, client.repository
     )
-    candidates: list[int] = []
+    expected_identity = {
+        "schema": "powdrr-work-item-publication-v1",
+        "repository": client.repository,
+        "issue_number": issue.number,
+        "plan_id": plan_id,
+        "item_id": dependency_id,
+        "input_contract_digest": input_contract_digest,
+        "purpose": "implementation",
+    }
+    default_branch = (
+        evidence_cache.default_branch(client)
+        if evidence_cache is not None
+        else client.default_branch()
+    )
+    candidates: set[int] = set()
     if pull_request_number is not None:
-        candidates.append(pull_request_number)
-    else:
-        # A worker can publish and merge a valid PR, then fail before it writes
-        # the issue marker or completed checkpoint. GitHub's issue timeline is
-        # the durable link in that case; consider only same-repository PR
-        # cross-references whose descriptions explicitly close this issue.
-        linked_pull_requests = (
-            evidence_cache.linked_pull_requests(client, issue.number)
-            if evidence_cache is not None
-            else client.linked_pull_requests(issue.number)
+        candidates.add(pull_request_number)
+    # The issue timeline can retain a PR cross-reference if the worker exits
+    # before it records the issue comment or task checkpoint.
+    linked_pull_requests = (
+        evidence_cache.linked_pull_requests(client, issue.number)
+        if evidence_cache is not None
+        else client.linked_pull_requests(issue.number)
+    )
+    for linked in linked_pull_requests:
+        number = _same_repository_pull_request_number(
+            linked.get("html_url"), client.repository
         )
-        for linked in linked_pull_requests:
-            number = _same_repository_pull_request_number(
-                linked.get("html_url"), client.repository
-            )
-            if number is not None and _pull_request_closes_issue(
-                linked.get("body"),
-                repository=client.repository,
-                issue_number=issue.number,
-            ):
-                candidates.append(number)
+        if number is not None and _pull_request_closes_issue(
+            linked.get("body"),
+            repository=client.repository,
+            issue_number=issue.number,
+        ):
+            candidates.add(number)
 
-    for number in candidates:
+    valid_publications: list[int] = []
+    for number in sorted(candidates):
         pull_request = (
             evidence_cache.pull_request(client, number)
             if evidence_cache is not None
             else client.pull_request(number)
         )
         merge_commit = pull_request.get("merge_commit_sha")
+        base = pull_request.get("base")
         if (
             pull_request.get("merged") is True
+            and _pull_request_work_item_identity(pull_request.get("body"))
+            == expected_identity
+            and isinstance(base, Mapping)
+            and base.get("ref") == default_branch
             and _pull_request_closes_issue(
                 pull_request.get("body"),
                 repository=client.repository,
@@ -5924,8 +5961,23 @@ def _dependency_has_merged_publication(
             and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit)
             is not None
         ):
-            return True
-    return False
+            valid_publications.append(number)
+    return len(valid_publications) == 1
+
+
+def _pull_request_work_item_identity(body: object) -> Mapping[str, Any] | None:
+    if not isinstance(body, str):
+        return None
+    marker = re.search(r"<!-- powdrr-work-item-publication:v1 (\{[^\n]*\}) -->", body)
+    if marker is None:
+        return None
+    try:
+        identity = json.loads(marker.group(1))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(identity, Mapping):
+        return None
+    return identity
 
 
 def _latest_published_pr_url_from_issue_comments(

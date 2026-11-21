@@ -93,6 +93,13 @@ def test_existing_workflow_directory_uses_shared_task_runner(
     assert config.task_checkpoint_callback is callback
     assert config.github_issue_number == 42
     assert config.github_repository == "powdrr-io/example"
+    assert config.work_item_identity["schema"] == "powdrr-work-item-publication-v1"
+    assert config.work_item_identity["plan_id"] == "plan-1"
+    assert config.work_item_identity["item_id"] == "search"
+    digest = config.work_item_identity["input_contract_digest"]
+    assert (
+        isinstance(digest, str) and digest.startswith("sha256:") and len(digest) == 71
+    )
     assert captured["stdout"] is output
     assert captured["stderr"] is errors
 
@@ -202,6 +209,9 @@ def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
     assert captured["workflow_inputs"]["github_issue_number"] == 42
     assert captured["workflow_inputs"]["github_repository"] == "powdrr-io/example"
     assert context["original"] == "context"
+    assert context["work_item_identity"]["plan_id"] == "plan-1"
+    assert context["work_item_identity"]["item_id"] == "search"
+    assert context["work_item_identity"]["issue_number"] == 42
     assert context["title"] == "Add search"
     assert context["scope"] == ["search endpoint"]
     assert context["implementation_steps"] == ["Add an index."]

@@ -150,6 +150,9 @@ class _DependencyEvidenceCache:
     pull_requests_by_number: dict[int, Mapping[str, Any]] = dataclass_field(
         default_factory=dict
     )
+    linked_pull_requests_by_issue: dict[int, tuple[Mapping[str, Any], ...]] = (
+        dataclass_field(default_factory=dict)
+    )
     dependency_results: dict[tuple[str, str, int | None], bool] = dataclass_field(
         default_factory=dict
     )
@@ -165,6 +168,15 @@ class _DependencyEvidenceCache:
         if number not in self.pull_requests_by_number:
             self.pull_requests_by_number[number] = client.pull_request(number)
         return self.pull_requests_by_number[number]
+
+    def linked_pull_requests(
+        self, client: GitHubIssueClient, issue_number: int
+    ) -> tuple[Mapping[str, Any], ...]:
+        if issue_number not in self.linked_pull_requests_by_issue:
+            self.linked_pull_requests_by_issue[issue_number] = (
+                client.linked_pull_requests(issue_number)
+            )
+        return self.linked_pull_requests_by_issue[issue_number]
 
 
 @dataclass(frozen=True, slots=True)
@@ -1099,6 +1111,36 @@ class GitHubIssueClient:
     def pull_request(self, number: int) -> Mapping[str, Any]:
         result = self._api("GET", f"repos/{self.repository}/pulls/{number}")
         return _json_mapping(result.stdout, "pull request")
+
+    def linked_pull_requests(self, issue_number: int) -> tuple[Mapping[str, Any], ...]:
+        """Return PRs GitHub records as cross-references for this issue."""
+        result = self._invoke(
+            [
+                "api",
+                "-H",
+                "Accept: application/vnd.github+json",
+                "--paginate",
+                f"repos/{self.repository}/issues/{issue_number}/timeline?per_page=100",
+            ]
+        )
+        events = _parse_paginated_json_arrays(
+            result.stdout, description="issue timeline"
+        )
+        linked: list[Mapping[str, Any]] = []
+        for event in events:
+            if (
+                not isinstance(event, Mapping)
+                or event.get("event") != "cross-referenced"
+            ):
+                continue
+            source = event.get("source")
+            source_issue = source.get("issue") if isinstance(source, Mapping) else None
+            if not isinstance(source_issue, Mapping) or not isinstance(
+                source_issue.get("pull_request"), Mapping
+            ):
+                continue
+            linked.append(source_issue)
+        return tuple(linked)
 
     def _api(
         self, method: str, endpoint: str, *arguments: str
@@ -5840,24 +5882,50 @@ def _dependency_has_merged_publication(
     pull_request_number = _same_repository_pull_request_number(
         pull_request_url, client.repository
     )
-    if pull_request_number is None:
-        return False
-    pull_request = (
-        evidence_cache.pull_request(client, pull_request_number)
-        if evidence_cache is not None
-        else client.pull_request(pull_request_number)
-    )
-    merge_commit = pull_request.get("merge_commit_sha")
-    return (
-        pull_request.get("merged") is True
-        and _pull_request_closes_issue(
-            pull_request.get("body"),
-            repository=client.repository,
-            issue_number=issue.number,
+    candidates: list[int] = []
+    if pull_request_number is not None:
+        candidates.append(pull_request_number)
+    else:
+        # A worker can publish and merge a valid PR, then fail before it writes
+        # the issue marker or completed checkpoint. GitHub's issue timeline is
+        # the durable link in that case; consider only same-repository PR
+        # cross-references whose descriptions explicitly close this issue.
+        linked_pull_requests = (
+            evidence_cache.linked_pull_requests(client, issue.number)
+            if evidence_cache is not None
+            else client.linked_pull_requests(issue.number)
         )
-        and isinstance(merge_commit, str)
-        and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit) is not None
-    )
+        for linked in linked_pull_requests:
+            number = _same_repository_pull_request_number(
+                linked.get("html_url"), client.repository
+            )
+            if number is not None and _pull_request_closes_issue(
+                linked.get("body"),
+                repository=client.repository,
+                issue_number=issue.number,
+            ):
+                candidates.append(number)
+
+    for number in candidates:
+        pull_request = (
+            evidence_cache.pull_request(client, number)
+            if evidence_cache is not None
+            else client.pull_request(number)
+        )
+        merge_commit = pull_request.get("merge_commit_sha")
+        if (
+            pull_request.get("merged") is True
+            and _pull_request_closes_issue(
+                pull_request.get("body"),
+                repository=client.repository,
+                issue_number=issue.number,
+            )
+            and isinstance(merge_commit, str)
+            and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit)
+            is not None
+        ):
+            return True
+    return False
 
 
 def _latest_published_pr_url_from_issue_comments(

@@ -14,8 +14,11 @@ classification remains necessary for other evidence. A producer command and
 reusable GitHub Actions workflow now publish exact-commit artifacts from explicit
 verifier evidence and requirement bindings. Target repositories still need to
 connect their verifier job to the documented input artifact contract.
-Milestone 3 remains partial because arbitrary nested source logic still needs
-semantic interpretation and executable coverage. Milestones 4–5 have their
+Milestone 3 now revalidates accepted source-logic trees at test-design time and
+tests their full carry-forward into generated test-case bindings, validating
+against pinned anchors even when the excerpt limit omits an anchor from the
+prompt; deciding what arbitrary source language means remains semantic work.
+Milestones 4–5 have their
 deterministic compilation and receipt-validation paths; edge-case tests are
 present, while semantic relevance judgments remain model-backed. Milestone 6
 records provider-reported usage and cost per call, including decision batches,
@@ -758,9 +761,16 @@ check public API/test consumers explicitly; this audit changes none of them.
    malformed, unsupported, or ambiguous logic must stop or go to review.
    Canonical unresolved test dimensions now remain unresolved through the typed
    behavior scenario and are visible to downstream gates.
-   Continue closing gaps between accepted source logic and executable coverage;
-   do not remove semantic review solely because a typed tree exists.
-   Unknown meaning stops or goes to review rather than silently becoming
+   The test-design boundary now validates tree shape, allowed requirement source
+   references, and exact quotes against all pinned source anchors before including
+   source_logic in the model request. Validation uses the pinned anchors separately
+   from the excerpt-limited prompt, so valid logic is not rejected when a relevant
+   anchor is omitted to bound model input. An end-to-end compiler fixture carries
+   nested conditional, all_of, ordered, and any_of logic into generated workflow
+   requirement and per-case bindings. This proves the typed structure is not
+   dropped before execution. It does not prove that a proposed scenario
+   meaningfully tests each branch; that remains a semantic decision to measure and
+   review. Unknown meaning stops or goes to review rather than silently becoming
    context/not_applicable.
 4. **Compile formal dependency/structural cases.** Typed resource use and exact
    planned deltas derive edges/operations. Existing deterministic candidate
@@ -794,14 +804,15 @@ check public API/test consumers explicitly; this audit changes none of them.
    Do not add a second planner to bypass deterministic compilation failures.
 
 The request catalog describes the audited revision. Milestones 1–2 are
-implemented. Multi-phase assignment remains a semantic model decision, and
-milestone 3 remains partial until source-logic interpretation has complete
-executable coverage. Milestones 4–5 are implemented for deterministic
-compilation and receipt validation; semantic relevance judgments remain bounded
-model decisions. Milestone 6 now has per-question attribution, provider-reported
+implemented. Multi-phase assignment remains a semantic model decision. Milestone
+3's deterministic source-logic validation and carry-forward are implemented;
+semantic interpretation quality remains to be measured. Milestones 4–5 are
+implemented for deterministic compilation and receipt validation; semantic
+relevance judgments remain bounded model decisions. Milestone 6 now has per-question attribution, provider-reported
 usage/cost capture, and backward-compatible local summaries. The audit does
-not retain raw prompts or answers. Remaining work is to close M3 source-logic
-coverage gaps and measure live planning quality, latency, and cost.
+not retain raw prompts or answers. Remaining work is to measure live planning
+quality, latency, and cost, and review whether semantic model decisions can be
+reduced without weakening coverage.
 
 Provider-usage update: planning telemetry now preserves per-call token and cost
 fields when a provider reports them. Decision-provider responses carry their

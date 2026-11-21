@@ -153,6 +153,179 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     assert behavior["then"] == planned["required_test_cases"][0]["expected_outcome"]
 
 
+def test_test_design_revalidates_nested_source_logic_against_pinned_excerpts() -> None:
+    source_logic = {
+        "op": "conditional",
+        "condition": {
+            "source_ref": "anchor-logic",
+            "quote": "When primary path applies",
+        },
+        "then": {
+            "op": "all_of",
+            "children": [
+                {
+                    "op": "atom",
+                    "source_ref": "anchor-logic",
+                    "quote": "do B",
+                },
+                {
+                    "op": "ordered",
+                    "children": [
+                        {
+                            "op": "atom",
+                            "source_ref": "anchor-logic",
+                            "quote": "then C",
+                        },
+                        {
+                            "op": "atom",
+                            "source_ref": "anchor-logic",
+                            "quote": "finish C",
+                        },
+                    ],
+                },
+            ],
+        },
+        "else": {
+            "op": "any_of",
+            "children": [
+                {
+                    "op": "atom",
+                    "source_ref": "anchor-logic",
+                    "quote": "choose D",
+                },
+                {
+                    "op": "atom",
+                    "source_ref": "anchor-logic-secondary",
+                    "quote": "choose E",
+                },
+            ],
+        },
+    }
+    request = build_test_coverage_request(
+        {
+            "id": "item-logic",
+            "acceptance_criteria": ["The primary and fallback behavior is preserved."],
+        },
+        source_excerpts=(
+            SourceExcerpt(
+                "anchor-logic",
+                "When primary path applies, do B, then C, and finish C. "
+                "Otherwise choose D.",
+            ),
+        ),
+        source_anchor_text_by_ref={
+            "anchor-logic": (
+                "When primary path applies, do B, then C, and finish C. "
+                "Otherwise choose D."
+            ),
+            "anchor-logic-secondary": "Otherwise choose E.",
+        },
+        requirements=(
+            {
+                "id": "req-logic",
+                "statement": "The primary and fallback behavior is preserved.",
+                "source_refs": ["anchor-logic", "anchor-logic-secondary"],
+                "source_logic": [source_logic],
+            },
+        ),
+    )
+
+    request.validate()
+    requirement_fact = next(
+        fact
+        for fact in request.accepted_facts
+        if fact.ref_id == "planned-pr:item-logic"
+    )
+    assert requirement_fact.value["requirements"][0]["source_logic"] == [source_logic]
+
+
+@pytest.mark.parametrize(
+    "source_logic",
+    (
+        {
+            "op": "xor",
+            "children": [],
+        },
+        {
+            "op": "all_of",
+            "children": [
+                {"op": "atom", "source_ref": "missing", "quote": "do B"},
+                {"op": "atom", "source_ref": "anchor-logic", "quote": "do B"},
+            ],
+        },
+        {
+            "op": "all_of",
+            "children": [
+                {
+                    "op": "atom",
+                    "source_ref": "anchor-logic",
+                    "quote": "invented behavior",
+                },
+                {"op": "atom", "source_ref": "anchor-logic", "quote": "do B"},
+            ],
+        },
+        {
+            "op": "all_of",
+            "children": [{"op": "atom", "source_ref": "anchor-logic", "quote": "do B"}],
+        },
+    ),
+    ids=("unknown-operator", "unsupplied-anchor", "invented-quote", "short-group"),
+)
+def test_test_design_rejects_unvalidated_source_logic(
+    source_logic: dict[str, object],
+) -> None:
+    with pytest.raises(PlanningContractError, match="source_logic"):
+        build_test_coverage_request(
+            {
+                "id": "item-logic-invalid",
+                "acceptance_criteria": ["The source behavior is preserved."],
+            },
+            source_excerpts=(SourceExcerpt("anchor-logic", "When active, do B."),),
+            requirements=(
+                {
+                    "id": "req-logic",
+                    "statement": "The source behavior is preserved.",
+                    "source_logic": [source_logic],
+                },
+            ),
+        )
+
+
+def test_test_design_rejects_logic_outside_requirement_source_references() -> None:
+    source_logic = {
+        "op": "all_of",
+        "children": [
+            {
+                "op": "atom",
+                "source_ref": "anchor-secondary",
+                "quote": "do C",
+            },
+            {"op": "atom", "source_ref": "anchor-primary", "quote": "do B"},
+        ],
+    }
+
+    with pytest.raises(PlanningContractError, match="supplied source anchor"):
+        build_test_coverage_request(
+            {
+                "id": "item-source-ref-boundary",
+                "acceptance_criteria": ["The primary behavior is preserved."],
+            },
+            source_excerpts=(SourceExcerpt("anchor-primary", "do B."),),
+            source_anchor_text_by_ref={
+                "anchor-primary": "do B.",
+                "anchor-secondary": "do C.",
+            },
+            requirements=(
+                {
+                    "id": "req-primary",
+                    "statement": "The primary behavior is preserved.",
+                    "source_refs": ["anchor-primary"],
+                    "source_logic": [source_logic],
+                },
+            ),
+        )
+
+
 def test_unknown_test_dimension_is_carried_as_unresolved() -> None:
     request = build_test_coverage_request(
         {

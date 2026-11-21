@@ -79,6 +79,30 @@ def _behavior_scenario(scenario_id: str = "scenario:positive") -> dict[str, Any]
     }
 
 
+def _nested_source_logic() -> dict[str, Any]:
+    """Exercise every accepted source-logic operator in compiler fixtures."""
+
+    def atom() -> dict[str, str]:
+        return {
+            "op": "atom",
+            "source_ref": "anchor-01",
+            "quote": "source",
+        }
+
+    return {
+        "op": "conditional",
+        "condition": {"source_ref": "anchor-01", "quote": "source"},
+        "then": {
+            "op": "all_of",
+            "children": [
+                atom(),
+                {"op": "ordered", "children": [atom(), atom()]},
+            ],
+        },
+        "else": {"op": "any_of", "children": [atom(), atom()]},
+    }
+
+
 def _source_design_proposal(
     baseline: Mapping[str, Any],
     cases: list[dict[str, Any]],
@@ -721,23 +745,7 @@ def _fixture() -> tuple[ReviewedExecutionPlan, PlanningManifest, Any]:
                 "source_validation_groups": [
                     {"id": "validation:clause-01:1", "relation": "all_together"}
                 ],
-                "source_logic": [
-                    {
-                        "op": "all_of",
-                        "children": [
-                            {
-                                "op": "atom",
-                                "source_ref": "anchor-01",
-                                "quote": "source",
-                            },
-                            {
-                                "op": "atom",
-                                "source_ref": "anchor-01",
-                                "quote": "source",
-                            },
-                        ],
-                    }
-                ],
+                "source_logic": [_nested_source_logic()],
                 "related_requirement_ids": [],
             }
         ],
@@ -838,23 +846,7 @@ def test_compiler_round_trips_plan_and_emits_linked_artifacts() -> None:
                 source_refs=("anchor-01",),
                 source_group_ids=("validation:clause-01:1",),
                 source_validation_groups=(("validation:clause-01:1", "all_together"),),
-                source_logic=(
-                    {
-                        "op": "all_of",
-                        "children": [
-                            {
-                                "op": "atom",
-                                "source_ref": "anchor-01",
-                                "quote": "source",
-                            },
-                            {
-                                "op": "atom",
-                                "source_ref": "anchor-01",
-                                "quote": "source",
-                            },
-                        ],
-                    },
-                ),
+                source_logic=(_nested_source_logic(),),
             ),
         }
     ]

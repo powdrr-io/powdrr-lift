@@ -1172,6 +1172,10 @@ def _write_issue_worker_structrr_diff_artifacts(
             "generated tests do not match the test obligations recorded in the "
             "Structrr plan proposal"
         )
+    requirement_bindings_by_case = _validated_test_case_requirement_bindings(
+        proposed,
+        planned_case_ids=set(planned_cases_by_id),
+    )
 
     required_test_cases: list[dict[str, Any]] = []
     test_case_ids_by_file: dict[str, list[str]] = {}
@@ -1224,6 +1228,7 @@ def _write_issue_worker_structrr_diff_artifacts(
                 "description": description,
                 "status": "passed" if candidate_tests_passed else "failed",
                 "selectors": sorted(set(selectors)),
+                "requirement_bindings": requirement_bindings_by_case[case_id],
             }
         )
 
@@ -1333,6 +1338,92 @@ def _write_issue_worker_structrr_diff_artifacts(
         )
         outputs.append((relative_directory / evidence_path.name).as_posix())
     return tuple(outputs)
+
+
+def _validated_test_case_requirement_bindings(
+    proposed: Mapping[str, Any], *, planned_case_ids: set[str]
+) -> dict[str, list[dict[str, str]]]:
+    """Validate and index the compiler-owned requirement bindings by test case."""
+    raw_requirements = proposed.get("requirement_bindings")
+    if not isinstance(raw_requirements, list):
+        raise PowdrrExecutionError(
+            "planned PR context is missing compiled requirement bindings"
+        )
+    requirement_digests: dict[str, str] = {}
+    for binding in raw_requirements:
+        if not isinstance(binding, Mapping) or set(binding) != {
+            "requirement_id",
+            "requirement_digest",
+        }:
+            raise PowdrrExecutionError("compiled requirement binding is malformed")
+        requirement_id = binding.get("requirement_id")
+        requirement_digest = binding.get("requirement_digest")
+        if (
+            not isinstance(requirement_id, str)
+            or not re.fullmatch(r"[A-Za-z][A-Za-z0-9:._/-]{0,199}", requirement_id)
+            or not isinstance(requirement_digest, str)
+            or not re.fullmatch(r"sha256:[a-f0-9]{64}", requirement_digest)
+            or requirement_id in requirement_digests
+        ):
+            raise PowdrrExecutionError("compiled requirement binding is invalid")
+        requirement_digests[requirement_id] = requirement_digest
+
+    raw_case_bindings = proposed.get("test_case_requirement_bindings")
+    if not isinstance(raw_case_bindings, list):
+        raise PowdrrExecutionError(
+            "planned PR context is missing per-case requirement bindings"
+        )
+    result: dict[str, list[dict[str, str]]] = {}
+    for case_binding in raw_case_bindings:
+        if not isinstance(case_binding, Mapping) or set(case_binding) != {
+            "test_case_id",
+            "requirement_bindings",
+        }:
+            raise PowdrrExecutionError("per-case requirement binding is malformed")
+        case_id = case_binding.get("test_case_id")
+        raw_bindings = case_binding.get("requirement_bindings")
+        if (
+            not isinstance(case_id, str)
+            or case_id not in planned_case_ids
+            or case_id in result
+            or not isinstance(raw_bindings, list)
+        ):
+            raise PowdrrExecutionError("per-case requirement binding is invalid")
+        bindings: list[dict[str, str]] = []
+        seen_requirement_ids: set[str] = set()
+        for binding in raw_bindings:
+            if not isinstance(binding, Mapping) or set(binding) != {
+                "requirement_id",
+                "requirement_digest",
+            }:
+                raise PowdrrExecutionError(
+                    f"case {case_id!r} has a malformed requirement binding"
+                )
+            requirement_id = binding.get("requirement_id")
+            requirement_digest = binding.get("requirement_digest")
+            if (
+                not isinstance(requirement_id, str)
+                or not isinstance(requirement_digest, str)
+                or requirement_digests.get(requirement_id) != requirement_digest
+                or requirement_id in seen_requirement_ids
+            ):
+                raise PowdrrExecutionError(
+                    f"case {case_id!r} has an unallocated or duplicate requirement"
+                )
+            seen_requirement_ids.add(requirement_id)
+            bindings.append(
+                {
+                    "requirement_id": requirement_id,
+                    "requirement_digest": requirement_digest,
+                }
+            )
+        result[case_id] = sorted(bindings, key=lambda item: item["requirement_id"])
+
+    if set(result) != planned_case_ids:
+        raise PowdrrExecutionError(
+            "per-case requirement bindings do not match the planned test cases"
+        )
+    return result
 
 
 def _merge_structrr_decision_sections(

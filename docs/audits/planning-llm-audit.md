@@ -343,8 +343,11 @@ incomplete bindings. A reusable GitHub Actions workflow at
 `.github/workflows/publish-requirement-execution-receipts.yml` downloads that
 input from the same workflow run and uploads the named receipt artifact. The
 target repository's verifier job supplies `receipt-input.json` from its pinned
-execution plan and observed verifier records; the producer does not infer links
-from test names or intent references. See
+execution plan and observed verifier records. Issue-worker Structrr diff
+artifacts now preserve each planned test case's stable ID, selectors, and exact
+requirement ID/digest bindings so a target job can join those inputs
+deterministically; the producer does not infer links from test names or intent
+references. See
 `docs/guides/requirement-execution-receipts.md` for the caller contract.
 `plan` and `plan-resume` now discover the named
 `powdrr-requirement-execution-receipts` artifact from completed successful

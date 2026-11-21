@@ -31,11 +31,15 @@ containing one `receipt-input.json` file. The file has this shape:
 ```
 
 `obligations` and `evidence` are the corresponding records emitted by
-`VerificationEvidenceRunner`. Requirement bindings must come from the pinned
-compiled execution plan. The producer does not infer a requirement from an
-obligation name, selector, test content, or story reference. One verifier result
-may be bound to multiple requirements, but a requirement may appear only once
-in the input.
+`VerificationEvidenceRunner`. Requirement bindings come from the pinned
+compiled execution plan. Powdrr issue-worker PR artifacts persist each planned
+test case's stable ID, selectors, and exact requirement ID/digest pairs in
+`docs/structrr/diffs/*/*/structrr-diff.yaml` under
+`verification.required_test_cases`. A verifier integration joins each observed
+obligation to that record by its stable test-case ID when building this input.
+The producer does not infer a requirement from a selector, test content, or
+story reference. One verifier result may be bound to multiple requirements, but
+a requirement may appear only once in the input.
 
 After uploading the input, a downstream job calls the reusable workflow with a
 full Powdrr commit SHA:

@@ -1,58 +1,248 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1661
-title: Recover merged dependency PRs from issue timelines
+change_id: 1661
+title: Batch bounded work-unit proposal questions
 intent:
-  problem: A dependency issue can remain blocked after its implementation PR has merged when the worker fails before recording the publication marker or completion checkpoint.
-  goal: Let Powdrr reconcile merged implementation PRs from GitHub's durable issue timeline so downstream work can continue without human bookkeeping.
+  problem: Large planning runs send one provider request for each independent work-unit proposal question even when those requests fit the existing batch contract.
+  goal: Reduce proposal calls with small bounded batches while preserving per-question validation, checkpoint identity, and a singleton replay path for failed batch members.
 human-decisions: []
 structured_files: []
 files:
-  - path: src/powdrr_lift/workrr/github_issue_queue.py
+  - path: packages/service/src/powdrr_service/planning/questions.py
     type: modified
-    span: {start_line: 153, end_line: 155}
-    summary: Cache linked pull requests discovered for each dependency issue during queue reconciliation.
-    rationale: Avoid repeated timeline API calls when the same dependency is evaluated more than once.
-  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    span: {start_line: 23, end_line: 23}
+    summary: Define the combined work-unit batch input bound.
+    rationale: Cap paired proposal payload size.
+  - path: packages/service/src/powdrr_service/planning/questions.py
     type: modified
-    span: {start_line: 172, end_line: 180}
-    summary: Cache the linked pull requests found for each dependency issue.
-    rationale: Reuse the timeline evidence across dependency checks in one queue run.
-  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    span: {start_line: 31, end_line: 31}
+    summary: Export the work-unit batch input limit.
+    rationale: Make the contract available to focused tests.
+  - path: packages/service/src/powdrr_service/planning/questions.py
     type: modified
-    span: {start_line: 1115, end_line: 1144}
-    summary: Read pull request cross-references from GitHub's issue timeline API.
-    rationale: Recover durable links to published PRs even when Powdrr did not write its issue marker.
-  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    span: {start_line: 233, end_line: 233}
+    summary: Batch independent work-unit proposal questions in pairs.
+    rationale: Reduce provider calls while keeping each batch small.
+  - path: packages/service/src/powdrr_service/planning/questions.py
     type: modified
-    span: {start_line: 5885, end_line: 5896}
-    summary: Validate timeline-linked PRs against the exact issue, repository, merged state, and merge commit before fulfilling a dependency.
-    rationale: Resume downstream work only when the linked implementation is proven to have merged and closed this dependency.
-  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    span: {start_line: 297, end_line: 314}
+    summary: Remove obsolete schema enum rewriting for work-unit batch members.
+    rationale: Current work-unit schemas do not contain the fields that legacy rewriting expected; member parsers still enforce their schemas.
+  - path: packages/service/src/powdrr_service/planning/questions.py
     type: modified
-    span: {start_line: 5898, end_line: 5928}
-    summary: Verify each recovered PR's merged state, closing reference, and merge commit.
-    rationale: Preserve strict evidence requirements before unblocking downstream work.
-  - path: tests/test_github_issue_queue.py
+    span: {start_line: 398, end_line: 399}
+    summary: Apply the dedicated combined input limit to work-unit batches.
+    rationale: Preserve per-kind payload bounds.
+  - path: packages/service/src/powdrr_service/planning/questions.py
     type: modified
-    span: {start_line: 678, end_line: 681}
-    summary: Add timeline link storage and request accounting to the GitHub issue client test double.
-    rationale: Make dependency recovery tests deterministic and verify timeline evidence is read once.
-  - path: tests/test_github_issue_queue.py
+    span: {start_line: 427, end_line: 427}
+    summary: Carry parent batch identity on a failed member result.
+    rationale: Preserve the context needed to split failed batches on replay.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
     type: modified
-    span: {start_line: 780, end_line: 785}
-    summary: Implement linked PR lookup in the GitHub issue client test double.
-    rationale: Exercise dependency reconciliation without live GitHub calls.
-  - path: tests/test_github_issue_queue.py
+    span: {start_line: 160, end_line: 160}
+    summary: Accept an optional parent batch ID when recording a failed answer.
+    rationale: Keep the journal schema backward compatible while recording batch lineage.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
     type: modified
-    span: {start_line: 1054, end_line: 1172}
-    summary: Cover successful timeline recovery and reject cross-repository, wrong-issue, unmerged, or invalid-merge evidence.
-    rationale: Prevent unrelated or incomplete PRs from unblocking dependent work.
-  - path: tests/test_github_issue_queue.py
+    span: {start_line: 172, end_line: 173}
+    summary: Include the parent batch ID only when present.
+    rationale: Preserve existing checkpoint payloads for non-batched questions.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 1494, end_line: 1539}
-    summary: Verify timeline API parsing returns only cross-referenced pull requests.
-    rationale: Ensure GitHub timeline events are interpreted deterministically.
-entities: []
-entity_relationships: []
-invariants: []
+    span: {start_line: 538, end_line: 538}
+    summary: Track proposal requirement groups that replay must split.
+    rationale: Generalize recovery beyond oversized answers.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 579, end_line: 581}
+    summary: Configure the driver to split failed or oversized proposal groups.
+    rationale: Ensure replay retries at singleton granularity.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1192, end_line: 1192}
+    summary: Emit singleton requests for groups selected by replay.
+    rationale: Avoid repeating the failed batch shape.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1569, end_line: 1569}
+    summary: Include split groups in the accepted-assembly cache key.
+    rationale: Invalidate cached assembly when replay changes proposal grouping.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 268, end_line: 268}
+    summary: Collect proposal groups selected for replay splitting.
+    rationale: Replace oversized-only recovery tracking.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 292, end_line: 296}
+    summary: Recognize malformed batch responses and members with recorded batch IDs.
+    rationale: Recover incomplete batch answers as well as oversized responses.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 300, end_line: 301}
+    summary: Return the selected requirement groups to the state machine.
+    rationale: Let deterministic question generation split the failed groups.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 566, end_line: 566}
+    summary: Collect replay-selected requirement groups for splitting.
+    rationale: Replace oversized-only recovery tracking.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 570, end_line: 572}
+    summary: Configure replay splitting on the state machine before it resumes.
+    rationale: Rebuild subsequent requests from journaled batch failures.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 751, end_line: 751}
+    summary: Attach parent batch identity to a parsed invalid member.
+    rationale: Keep the failed member linked to its original request.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 781, end_line: 781}
+    summary: Attach parent batch identity to a response with an invalid answer list.
+    rationale: Enable singleton recovery for malformed combined responses.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 799, end_line: 799}
+    summary: Attach parent batch identity to an omitted batch member.
+    rationale: Enable singleton recovery for missing member answers.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 814, end_line: 814}
+    summary: Attach parent batch identity to another member validation failure.
+    rationale: Keep all failed member paths recoverable.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 876, end_line: 876}
+    summary: Persist parent batch identity on the needs-answer checkpoint.
+    rationale: Make recovery durable across process restarts.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1438, end_line: 1438}
+    summary: Collect replay-selected groups in the operation executor.
+    rationale: Keep operation recovery aware of batched proposal failures.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1441, end_line: 1442}
+    summary: Find the optional failed-group replay hook.
+    rationale: Preserve compatibility with state machines that do not use proposal splitting.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1444, end_line: 1445}
+    summary: Apply failed-group splitting before continuing operation replay.
+    rationale: Keep both planning resume paths consistent.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 138, end_line: 158}
+    summary: Assert paired proposals reduce calls while preserving fixture source coverage.
+    rationale: Guard the optimization with deterministic performance and correctness evidence.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 752, end_line: 753}
+    summary: Update live report expectations for the paired proposal request.
+    rationale: Keep report metric coverage aligned with current batching.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 1094, end_line: 1095}
+    summary: Expect paired work-unit question batches.
+    rationale: Cover the new bounded batch grouping.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 1268, end_line: 1268}
+    summary: Use generalized failed-group replay setup.
+    rationale: Keep assembly recovery tests on the current driver interface.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 1275, end_line: 1275}
+    summary: Use generalized failed-group replay setup for supplemental proposals.
+    rationale: Cover mixed singleton and grouped retries.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 25, end_line: 25}
+    summary: Import the work-unit batch input limit for contract assertions.
+    rationale: Keep size-bound tests aligned with the new public constant.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 58, end_line: 58}
+    summary: Assert the dedicated batch input limit.
+    rationale: Prevent accidental growth of the combined request bound.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 415, end_line: 415}
+    summary: Rename the no-batching test to describe paired batching.
+    rationale: Keep test intent accurate.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 424, end_line: 424}
+    summary: Build enough members to test two full batches and a singleton.
+    rationale: Cover stable pairing order.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 429, end_line: 434}
+    summary: Assert batch sizes and member ordering.
+    rationale: Protect the per-question identity contract.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1021, end_line: 1021}
+    summary: Rename the failed proposal replay regression test.
+    rationale: Reflect recovery for malformed batches as well as oversized responses.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1082, end_line: 1105}
+    summary: Add a malformed batch checkpoint with parent batch identity.
+    rationale: Verify batch failures enter singleton replay.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1110, end_line: 1110}
+    summary: Update the test state machine to accept generalized split groups.
+    rationale: Follow the replay interface change.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1129, end_line: 1129}
+    summary: Assert the failed batch's requirements are selected for splitting.
+    rationale: Confirm the checkpoint lineage drives recovery.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 714, end_line: 730}
+    summary: Record bounded proposal batching, benchmark results, and live-provider evaluation gap.
+    rationale: Keep the active plan based on measured evidence and explicit limitations.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 867, end_line: 877}
+    summary: Document proposal batching limits, replay behavior, and live semantic completeness gap.
+    rationale: Keep the LLM audit accurate about the changed call path.
+entities:
+  - id: bounded-work-unit-proposal-batching
+    type: Function
+    action: added
+  - id: failed-work-unit-batch-replay
+    type: Regression test
+    action: added
+  - id: work-unit-batching-call-count-evaluation
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: failed-batch-replay-protects-bounded-batching
+    type: verifies
+    source: failed-work-unit-batch-replay
+    target: bounded-work-unit-proposal-batching
+    action: added
+    description: The replay regression test checks that a failed batch falls back to singleton work-unit proposals.
+  - id: deterministic-benchmark-measures-batching
+    type: measures
+    source: work-unit-batching-call-count-evaluation
+    target: bounded-work-unit-proposal-batching
+    action: added
+    description: The deterministic profile checks proposal call reduction together with source obligation and work-unit coverage invariants.
+invariants:
+  - id: proposal-batch-members-retain-independent-validation
+    description: Each batched proposal member keeps its own question ID, answer schema, parser, and input size bound.
+    action: added
+  - id: failed-proposal-batches-replay-as-singletons
+    description: A failed work-unit batch member records its parent batch question ID and its requirement group is split into singleton requests on replay.
+    action: added
+  - id: batching-does-not-claim-live-semantic-completeness
+    description: Synthetic benchmark call reduction is not treated as evidence that live model outputs cover all requested work-unit groups.
+    action: added
 guidance: []

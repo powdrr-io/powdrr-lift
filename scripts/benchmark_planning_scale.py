@@ -116,6 +116,22 @@ def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
         }
     phases = report.get("phases")
     question_kinds = report.get("by_question_kind")
+    source_obligation_evaluation = report.get("source_obligation_evaluation")
+    compact_source_obligation_evaluation = (
+        {
+            key: source_obligation_evaluation[key]
+            for key in (
+                "status",
+                "exact_source_statement_matches",
+                "expected_source_statements",
+                "accepted_requirement_count",
+                "work_unit_count",
+            )
+            if key in source_obligation_evaluation
+        }
+        if isinstance(source_obligation_evaluation, Mapping)
+        else None
+    )
     compact_phases = (
         {
             name: {
@@ -205,6 +221,7 @@ def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
         "dependency_candidates_unavailable_reason": report.get(
             "dependency_candidates_unavailable_reason"
         ),
+        "source_obligation_evaluation": compact_source_obligation_evaluation,
         "unresolved_question_count": len(report.get("pending_questions", ())),
         "compile_error": report.get("compile_error"),
     }
@@ -358,6 +375,90 @@ def fixture_shape_mismatches(
             [profile.min_work_units, profile.work_units],
         )
     return mismatches
+
+
+def source_obligation_evaluation(
+    profile: Profile,
+    *,
+    anchor_text_by_id: Mapping[str, str],
+    requirements: Sequence[Any],
+    work_units: Sequence[Any],
+) -> dict[str, Any]:
+    """Compare synthetic source obligations with extraction and unit assignment."""
+    expected_statements = [
+        f"Implement behavior outcome {ordinal} as a Python module."
+        for ordinal in range(1, profile.requirements + 1)
+    ]
+
+    def normalize(value: str) -> str:
+        return " ".join(value.split())
+
+    expected_counts = Counter(map(normalize, expected_statements))
+    actual_counts = Counter(
+        normalize(requirement.statement)
+        for requirement in requirements
+        if isinstance(getattr(requirement, "statement", None), str)
+    )
+    exact_matches = sum((expected_counts & actual_counts).values())
+    missing_statements = list((expected_counts - actual_counts).elements())
+    unexpected_statements = list((actual_counts - expected_counts).elements())
+
+    source_binding_errors = []
+    for requirement in requirements:
+        statement = getattr(requirement, "statement", None)
+        source_refs = getattr(requirement, "source_refs", ())
+        if not isinstance(statement, str) or not source_refs:
+            source_binding_errors.append(getattr(requirement, "id", "unknown"))
+            continue
+        if any(
+            ref not in anchor_text_by_id
+            or normalize(anchor_text_by_id[ref]) != normalize(statement)
+            for ref in source_refs
+        ):
+            source_binding_errors.append(getattr(requirement, "id", "unknown"))
+
+    requirement_ids = {
+        requirement.id
+        for requirement in requirements
+        if isinstance(getattr(requirement, "id", None), str)
+    }
+    assignment_counts = Counter(
+        requirement_id
+        for unit in work_units
+        for requirement_id in getattr(unit, "requirement_ids", ())
+        if isinstance(requirement_id, str)
+    )
+    missing_assignments = sorted(requirement_ids - assignment_counts.keys())
+    duplicate_assignments = sorted(
+        requirement_id
+        for requirement_id, count in assignment_counts.items()
+        if count > 1 and requirement_id in requirement_ids
+    )
+    unknown_assignments = sorted(assignment_counts.keys() - requirement_ids)
+    status = (
+        "matched"
+        if not missing_statements
+        and not unexpected_statements
+        and not source_binding_errors
+        and not missing_assignments
+        and not duplicate_assignments
+        and not unknown_assignments
+        else "mismatch"
+    )
+    return {
+        "status": status,
+        "scope": "synthetic_source_and_assignment_checks_only",
+        "exact_source_statement_matches": exact_matches,
+        "expected_source_statements": len(expected_statements),
+        "source_binding_error_requirement_ids": sorted(set(source_binding_errors)),
+        "missing_source_statements": missing_statements,
+        "unexpected_source_statements": unexpected_statements,
+        "accepted_requirement_count": len(requirements),
+        "work_unit_count": len(work_units),
+        "missing_work_unit_requirement_ids": missing_assignments,
+        "duplicate_work_unit_requirement_ids": duplicate_assignments,
+        "unknown_work_unit_requirement_ids": unknown_assignments,
+    }
 
 
 def item_sizing_summary(
@@ -1029,6 +1130,15 @@ def run_profile(
     dependency_metrics, dependency_metrics_error = dependency_metrics_for(
         machine, accepted
     )
+    source_obligation_metrics = source_obligation_evaluation(
+        profile,
+        anchor_text_by_id={
+            anchor.id: document.text[anchor.start_offset : anchor.end_offset]
+            for anchor in source.anchors
+        },
+        requirements=accepted_requirements or (),
+        work_units=accepted_units or (),
+    )
     item_sizing = (
         item_sizing_summary(machine.accepted_item_descriptions(accepted))
         if compiled is not None
@@ -1051,6 +1161,7 @@ def run_profile(
         "work_units": None if accepted_units is None else len(accepted_units),
         "plan_items": None if compiled is None else len(compiled.plan.items),
         "compile_error": compile_error,
+        "source_obligation_evaluation": source_obligation_metrics,
         "pending_questions": [
             {
                 "question_id": request.question.question_id,
@@ -1142,6 +1253,11 @@ def run_profile(
         }
     if mismatches and enforce_fixture_shape:
         raise RuntimeError(f"profile {profile.name} failed expectations: {mismatches}")
+    if enforce_fixture_shape and source_obligation_metrics["status"] != "matched":
+        raise RuntimeError(
+            f"profile {profile.name} failed source-obligation evaluation: "
+            f"{source_obligation_metrics}"
+        )
     batch_limits = {
         kind: 6 if kind == "extract_requirements" else 4
         for kind in max_batch_members_by_question_kind

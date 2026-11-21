@@ -556,6 +556,7 @@ class SourceLedgerQuestionMachine:
         self._structural_change_request_cache: dict[
             tuple[tuple[str, ...], str], QuestionRequest[Any]
         ] = {}
+        self._structural_operations_cache: tuple[Mapping[str, Any], ...] | None = None
         self._structural_subject_scope_cache: dict[
             str, tuple[StructuralSubjectEnumerationScope, ...]
         ] = {}
@@ -1992,6 +1993,7 @@ class SourceLedgerQuestionMachine:
     def _structrr_requests(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[QuestionRequest[Any], ...]:
+        self._structural_operations_cache = None
         if self.structrr_baseline is None:
             return ()
         item_records = self._structrr_item_records(accepted_answers)
@@ -2322,81 +2324,8 @@ class SourceLedgerQuestionMachine:
             projected = project_structural_operations(projected, batch_operations)
             prior_operations.extend(batch_operations)
             completed.update(ready_item_ids)
+        self._structural_operations_cache = tuple(prior_operations)
         return ()
-
-    def _accepted_structural_subjects(
-        self,
-        item_id: str,
-        units: tuple[WorkUnit, ...],
-        requirement_source_refs: Mapping[str, Sequence[str]],
-        projected_baseline: Mapping[str, Any],
-        accepted_answers: Mapping[str, Mapping[str, Any]],
-    ) -> tuple[BoundStructuralSubject, ...]:
-        scopes = self._structural_subject_scope_cache.get(item_id)
-        item_subjects, excluded_subject_ids, reference_path_pairs = (
-            self._structural_subject_context_cache.get(item_id, ((), (), ()))
-        )
-        subjects: list[BoundStructuralSubject] = list(item_subjects)
-        if scopes is None:
-            scopes = partition_subject_enumeration_units(
-                plan_id=self.plan_id,
-                item_id=item_id,
-                units=units,
-                requirement_source_refs=requirement_source_refs,
-                source=self.source,
-                projected_baseline=projected_baseline,
-                prior_subjects=item_subjects,
-                excluded_subject_ids=excluded_subject_ids,
-                basedpyright_reference_path_pairs=reference_path_pairs,
-                code_symbol_coverage=self._structural_symbol_coverage,
-            )
-        for scope in scopes:
-            scope_id = scope.scope_id
-            scope_units = scope.units
-            source_refs = scope.source_refs
-            scope_paths = {
-                write.path for unit in scope_units for write in unit.planned_writes
-            }
-            scope_reference_pairs = tuple(
-                pair
-                for pair in reference_path_pairs
-                if pair[0] in scope_paths and pair[1] in scope_paths
-            )
-            page_ordinal = 1
-            prior_subjects: list[BoundStructuralSubject] = []
-            pages: list[StructuralSubjectPage] = []
-            while True:
-                request = build_subject_enumeration_request(
-                    plan_id=self.plan_id,
-                    item_id=item_id,
-                    units=scope_units,
-                    source=self.source,
-                    source_refs=source_refs,
-                    projected_baseline=projected_baseline,
-                    prior_subjects=(*item_subjects, *prior_subjects),
-                    excluded_subject_ids=excluded_subject_ids,
-                    basedpyright_reference_path_pairs=scope_reference_pairs,
-                    page_ordinal=page_ordinal,
-                    scope_id=scope_id,
-                    baseline_subject_index=scope.baseline_subject_index,
-                    code_symbol_coverage=self._structural_symbol_coverage,
-                )
-                answer = accepted_answers.get(request.question.question_id)
-                if answer is None:
-                    raise ValueError(
-                        "Structrr subject enumeration is incomplete at "
-                        f"{request.question.question_id}"
-                    )
-                page = request.parse_answer(answer)
-                pages.append(page)
-                prior_subjects = list(
-                    coalesce_structural_subjects((*prior_subjects, *page.records))
-                )
-                if not page.is_full:
-                    subjects.extend(complete_subject_enumeration(pages))
-                    break
-                page_ordinal += 1
-        return coalesce_structural_subjects(subjects)
 
     def _structrr_source_ref(self) -> str:
         return (
@@ -2415,83 +2344,18 @@ class SourceLedgerQuestionMachine:
             raise ValueError(
                 f"Structrr planning is incomplete at {pending[0].question.question_id}"
             )
-        item_records = self._structrr_item_records(accepted_answers)
-        operations: list[Mapping[str, Any]] = []
-        assembly = self.accepted_assembly(accepted_answers, plan_id=self.plan_id)
-        ledger = self.accepted_ledger(accepted_answers)
-        requirement_by_id = {item.id: item for item in ledger.requirements}
-        projected: Mapping[str, Any] = self.structrr_baseline
-        for record in item_records:
-            item_id = str(record["id"])
-            item_operations: list[Mapping[str, Any]] = []
-            units = tuple(record["units"])
-            subjects = self._accepted_structural_subjects(
-                item_id,
-                units,
-                {
-                    requirement_id: requirement.source_refs
-                    for requirement_id, requirement in requirement_by_id.items()
-                },
-                projected,
-                accepted_answers,
+        if self._structural_operations_cache is None:
+            raise PlanningCompilationError(
+                "Structrr planning completed without a canonical operation list"
             )
-            for subject in subjects:
-                if subject.section == "files":
-                    change = StructuralChange(
-                        subject.subject_id,
-                        subject.section,
-                        subject.item_id,
-                        subject.action,
-                        "change" if subject.is_new else "unchanged",
-                        {"path": subject.planned_path}
-                        if subject.is_new and subject.planned_path is not None
-                        else None,
-                        "Planned file path is absent from projected baseline."
-                        if subject.is_new
-                        else "File path already exists in projected baseline.",
-                        subject.requirement_ids,
-                        subject.unit_ids,
-                        subject.source_refs,
-                        subject.code_evidence,
-                    )
-                    operation = bind_structural_operation(change)
-                    if operation is not None:
-                        operations.append(operation)
-                        item_operations.append(operation)
-                    continue
-                request = build_structural_change_request(
-                    subject,
-                    projected_baseline=projected,
-                    taxonomy_entity_types=self.taxonomy_entity_types,
-                    planned_paths={
-                        write.path for unit in units for write in unit.planned_writes
-                    },
-                    known_entity_ids={
-                        str(entity.get("id"))
-                        for entity in projected.get("entities", [])
-                        if isinstance(entity, Mapping) and entity.get("id")
-                    },
-                    valid_example={
-                        "result": "unchanged",
-                        "reason": (
-                            "The projected state already satisfies this subject."
-                        ),
-                    },
-                )
-                change = request.parse_answer(
-                    accepted_answers[request.question.question_id]
-                )
-                operation = bind_structural_operation(change)
-                if operation is not None:
-                    operations.append(operation)
-                    item_operations.append(operation)
-            projected = project_structural_operations(projected, item_operations)
+        item_records = self._structrr_item_records(accepted_answers)
+        assembly = self.accepted_assembly(accepted_answers, plan_id=self.plan_id)
         return compile_structrr_plan(
             plan_id=self.plan_id,
             baseline_snapshot=self.structrr_baseline,
             items=item_records,
             item_order=assembly.dependency_graph.item_order,
-            operations=operations,
+            operations=list(self._structural_operations_cache),
             source_ref=self._structrr_source_ref(),
         )
 

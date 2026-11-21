@@ -846,6 +846,24 @@ deterministic rule ID/replay hit and downstream acceptance. Raw messages and
 answers are not needed for this audit and remain outside the planning telemetry
 journal. Private credentials and verifier data remain protected.
 
+Benchmark-evaluation update: each planning scale profile now reports exact
+matching of synthetic source obligations to extracted statements and pinned
+anchors, plus whether accepted requirements are assigned to work units exactly
+once. Deterministic profiles fail if this fixture oracle drifts; live profiles
+report mismatches for review. These checks measure source and assignment
+invariants for generated fixtures. They do not score paraphrases, arbitrary
+requirement quality, dependency correctness, branch coverage, or test relevance;
+those still need a reviewed live evaluation set.
+
+Structrr compilation update: the scale stress profile revealed that final
+compilation independently rebuilt structural-change requests after the review
+scheduler had accepted them. Because the scheduler evaluates all ready items
+against the same projected baseline, rebuilding one item at a time could create
+a question ID that was never checkpointed. Compilation now carries forward the
+canonical operation list parsed by the scheduler, avoiding a second semantic
+interpretation of already-reviewed subjects. The deterministic Structrr-stress
+profile covers this path.
+
 The default planning route has thirteen business question families plus three
 wrapper families. Nine dormant builders and eight older direct completion sites
 are catalogued separately to avoid inflating normal counts. A future refactor

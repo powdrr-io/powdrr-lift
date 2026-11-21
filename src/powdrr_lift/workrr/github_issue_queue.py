@@ -491,41 +491,50 @@ def _worker_store_root(repo_root: Path) -> Path:
 def _mark_abandoned_claims_for_reconciliation(
     client: GitHubIssueClient, repo_root: Path
 ) -> None:
-    """Fence crashed owners; a new attempt needs explicit state reconciliation."""
+    """Fence crashed owners and requeue unpublished work for safe reconciliation."""
     directory = _worker_store_root(repo_root) / "claims"
     for issue in client.list_issues(state="open"):
         claim_path = directory / f"issue-{issue.number}.json"
         record = _read_json_mapping(claim_path)
-        if record.get("state") != "running":
+        if record.get("state") not in {"running", "reconciliation_required"}:
             continue
         try:
             with file_lock(directory / f"issue-{issue.number}.lock", blocking=False):
-                # The OS lock, not heartbeat age, distinguishes an exited owner
-                # from a slow but live model invocation.
                 record = dict(_read_json_mapping(claim_path))
-                if record.get("state") != "running":
+                if record.get("state") == "running":
+                    # The OS lock, not heartbeat age, distinguishes an exited
+                    # owner from a slow but live model invocation.
+                    record["state"] = "reconciliation_required"
+                    record["recovery_state"] = "owner_exited"
+                    record["heartbeat_at"] = datetime.now(UTC).isoformat()
+                    _atomic_write_json(claim_path, record)
+                elif record.get("state") != "reconciliation_required":
                     continue
-                record["state"] = "reconciliation_required"
-                record["recovery_state"] = "owner_exited"
-                record["heartbeat_at"] = datetime.now(UTC).isoformat()
-                _atomic_write_json(claim_path, record)
         except Timeout:
+            continue
+        refreshed = client.get_issue(issue.number)
+        _recover_published_pull_request(
+            client=client, issue=refreshed, claim_path=claim_path
+        )
+        current_claim = _read_json_mapping(claim_path)
+        if current_claim.get("state") == "awaiting_ci":
             continue
         refreshed = client.get_issue(issue.number)
         client.update_issue(
             refreshed,
-            labels=_replace_queue_status(refreshed.labels, "blocked"),
+            labels=_replace_queue_status(refreshed.labels, "blocked_on_dependency"),
         )
-        client.add_comment(
-            refreshed,
-            "Powdrr found that the previous worker exited while holding this item. "
-            "The item was fenced to prevent duplicate commits or publication. "
-            "The worker retains responsibility for reconciling the durable "
-            "checkpoint, worktree, and any pull request before resuming.",
+        recovery_note = (
+            "Powdrr fenced the previous worker attempt, checked for an already "
+            "published pull request, and re-queued the item for deterministic "
+            "dependency reconciliation. It will resume automatically when its "
+            "reviewed prerequisites are satisfied."
         )
-        _recover_published_pull_request(
-            client=client, issue=refreshed, claim_path=claim_path
-        )
+        existing_comments = client.list_comments(issue.number)
+        if not any(
+            comment.get("body") == recovery_note for comment in existing_comments
+        ):
+            client.add_comment(refreshed, recovery_note)
 
 
 def _recover_published_pull_request(
@@ -546,6 +555,17 @@ def _recover_published_pull_request(
         if isinstance(comment.get("body"), str)
         for match in pattern.finditer(comment["body"])
     }
+    if not urls:
+        for linked in client.linked_pull_requests(issue.number):
+            url = linked.get("html_url")
+            if _same_repository_pull_request_number(
+                url, client.repository
+            ) is not None and _pull_request_closes_issue(
+                linked.get("body"),
+                repository=client.repository,
+                issue_number=issue.number,
+            ):
+                urls.add(url)
     numbers = {
         number
         for url in urls

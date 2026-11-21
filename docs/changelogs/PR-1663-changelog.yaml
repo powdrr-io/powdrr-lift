@@ -1,0 +1,115 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1663
+title: Resume abandoned issue work after reconciliation
+intent:
+  problem: A worker claim fenced after process exit can leave its issue in a generic blocked state, so later runs neither re-evaluate dependencies nor discover a PR published before the worker stopped.
+  goal: Reconcile fenced claims idempotently, recover existing linked PRs, and return unpublished work to dependency evaluation so Powdrr can resume eligible work without manual queue bookkeeping.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 488, end_line: 488}
+    summary: Describe abandoned-claim handling as automatic safe reconciliation.
+    rationale: Match the documented behavior to the worker's recovery path.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 493, end_line: 493}
+    summary: Revisit claims already marked as requiring reconciliation.
+    rationale: Let later worker runs finish a recovery interrupted after fencing.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 497, end_line: 498}
+    summary: Recheck claim ownership while holding the issue lock.
+    rationale: Confirm the prior owner exited before recovery proceeds.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 498, end_line: 505}
+    summary: Persist the fenced state and owner-exit recovery reason while preserving repeated reconciliation.
+    rationale: Let a later worker continue safely after an interruption and distinguish an exited process from an active owner.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 502, end_line: 505}
+    summary: Save the reconciliation-required state and refresh its timestamp.
+    rationale: Ensure later runs recognize the claim as safely fenced.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 510, end_line: 511}
+    summary: Check for an existing published PR before re-queuing abandoned work.
+    rationale: Avoid duplicate implementation or publication when the prior run already opened a PR.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 513, end_line: 517}
+    summary: Leave claims with recovered PRs awaiting CI observation.
+    rationale: Keep published work on its CI recovery path instead of returning it to implementation.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 519, end_line: 519}
+    summary: Return unpublished claims to dependency evaluation.
+    rationale: Allow queue reconciliation to make eligible work ready automatically.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 521, end_line: 525}
+    summary: Explain that fenced unpublished work will resume after reviewed prerequisites are satisfied.
+    rationale: Record the recovery decision and its next state on the issue.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span:
+      start_line: 527
+      end_line: 531
+    summary: Avoid duplicate comments when reconciliation is repeated.
+    rationale: Make repeated worker startup recovery idempotent.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 552, end_line: 562}
+    summary: Find a uniquely linked same-repository PR that closes the issue when its publication marker is missing.
+    rationale: Resume CI observation for an existing PR instead of publishing a duplicate.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 146, end_line: 148}
+    summary: Rename abandoned-claim coverage to describe its automatic recovery behavior.
+    rationale: Keep the test focused on the supported recovery contract.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 156, end_line: 169}
+    summary: Set up a merged published prerequisite for the abandoned follow-up item.
+    rationale: Isolate claim recovery from timeline-specific dependency evidence covered by the preceding change.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 171, end_line: 171}
+    summary: Exercise recovery when the issue still carries a claimed queue label.
+    rationale: Ensure stale queue labels do not prevent abandoned-claim recovery.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 185, end_line: 186}
+    summary: Test abandoned-claim fencing directly.
+    rationale: Verify recovery starts from the durable claim record.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 177, end_line: 177}
+    summary: Preserve the claimed queue state when setting up an abandoned claim.
+    rationale: Exercise reconciliation independently of the issue's stale status label.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 192, end_line: 192}
+    summary: Assert the issue is returned to dependency reconciliation.
+    rationale: Verify abandoned claims no longer remain in a generic blocked state.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 195, end_line: 199}
+    summary: Assert the claim remains fenced and repeated recovery adds one explanation.
+    rationale: Preserve duplicate-execution safeguards while recording the recovery decision.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 201, end_line: 211}
+    summary: Verify fulfilled dependencies promote the recovered item to ready.
+    rationale: Ensure interrupted work resumes automatically after its prerequisites merge.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 243, end_line: 277}
+    summary: Verify a missing publication marker is recovered from the GitHub issue timeline.
+    rationale: Prevent a duplicate PR when publication succeeded before the worker stopped.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

@@ -143,7 +143,9 @@ def test_worker_rejects_multi_host_without_a_shared_atomic_store(
         )
 
 
-def test_worker_fences_abandoned_claim_until_reconciliation(tmp_path: Path) -> None:
+def test_worker_requeues_abandoned_claim_for_dependency_reconciliation(
+    tmp_path: Path,
+) -> None:
     client = FakeIssueClient()
     publish_plan_issues(
         plan=plan(),
@@ -151,9 +153,22 @@ def test_worker_fences_abandoned_claim_until_reconciliation(tmp_path: Path) -> N
         plan_commit=PLAN_COMMIT,
         client=client,  # type: ignore[arg-type]
     )
-    issue = client.issues[0]
+    base_issue, issue = client.issues
+    client.update_issue(base_issue, state="closed")
+    client.linked_pull_requests_by_issue[base_issue.number] = (
+        {
+            "html_url": "https://github.com/example/project/pull/123",
+            "body": f"Closes #{base_issue.number}",
+        },
+    )
+    client.pull_requests[123] = {
+        "state": "closed",
+        "merged": True,
+        "merge_commit_sha": "d" * 40,
+        "body": f"Closes #{base_issue.number}",
+    }
     # A stale or missing queue label must not hide an abandoned durable claim.
-    client.update_issue(issue, labels=())
+    client.update_issue(issue, labels=(QUEUE_LABELS["claimed"],))
     claims_dir = github_issue_queue._worker_store_root(tmp_path) / "claims"
     claims_dir.mkdir(parents=True, exist_ok=True)
     github_issue_queue._atomic_write_json(
@@ -167,27 +182,33 @@ def test_worker_fences_abandoned_claim_until_reconciliation(tmp_path: Path) -> N
         },
     )
 
-    report = run_worker_once(
-        client=client,  # type: ignore[arg-type]
-        repo_root=tmp_path,
-        worker_id="worker-recovery",
-        run_task=lambda *_args: pytest.fail("abandoned work must not rerun blindly"),
-        plan_loader=lambda *_args, **_kwargs: plan(),
+    github_issue_queue._mark_abandoned_claims_for_reconciliation(
+        cast(GitHubIssueClient, client), tmp_path
     )
-
     updated = client.get_issue(issue.number)
     claim = json.loads(
         (claims_dir / f"issue-{issue.number}.json").read_text(encoding="utf-8")
     )
-    assert report.outcome == "no_eligible_work"
-    assert QUEUE_LABELS["blocked"] in updated.labels
+    assert QUEUE_LABELS["blocked_on_dependency"] in updated.labels
     assert claim["state"] == "reconciliation_required"
     assert claim["recovery_state"] == "owner_exited"
-    assert any(
-        "worker retains responsibility" in body
-        for number, body in client.comments
-        if number == issue.number
+    assert sum(number == issue.number for number, _body in client.comments) == 1
+
+    # Re-running reconciliation is safe and does not duplicate the explanation.
+    github_issue_queue._mark_abandoned_claims_for_reconciliation(
+        cast(GitHubIssueClient, client), tmp_path
     )
+    assert sum(number == issue.number for number, _body in client.comments) == 1
+
+    github_issue_queue._promote_unblocked_issues(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+        evidence_cache=github_issue_queue._DependencyEvidenceCache(),
+        issue_indexes={},
+    )
+    assert QUEUE_LABELS["ready"] in client.get_issue(issue.number).labels
+    assert client.pull_request_reads[123] == 1
 
 
 def test_abandoned_published_pr_resumes_ci_observation(tmp_path: Path) -> None:
@@ -217,6 +238,41 @@ def test_abandoned_published_pr_resumes_ci_observation(tmp_path: Path) -> None:
     assert claim["pull_request_number"] == 42
     assert claim["pull_request_head"] == "a" * 40
     assert QUEUE_LABELS["awaiting_ci"] in client.get_issue(17).labels
+
+
+def test_abandoned_published_pr_is_recovered_from_timeline_without_marker(
+    tmp_path: Path,
+) -> None:
+    issue = QueueIssue(17, "Task", "", "open", (QUEUE_LABELS["blocked"],), "")
+    client = FakeIssueClient((issue,))
+    client.linked_pull_requests_by_issue[17] = (
+        {
+            "html_url": "https://github.com/example/project/pull/42",
+            "body": "Implements the task.\n\nCloses #17",
+        },
+    )
+    client.pull_requests[42] = {
+        "state": "open",
+        "body": "Implements the task.\n\nCloses #17",
+        "head": {"sha": "a" * 40},
+    }
+    claim_path = tmp_path / "issue-17.json"
+    claim_path.write_text(
+        json.dumps({"state": "reconciliation_required", "generation": 2}),
+        encoding="utf-8",
+    )
+
+    github_issue_queue._recover_published_pull_request(
+        client=client,  # type: ignore[arg-type]
+        issue=issue,
+        claim_path=claim_path,
+    )
+
+    claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    assert claim["state"] == "awaiting_ci"
+    assert claim["pull_request_number"] == 42
+    assert QUEUE_LABELS["awaiting_ci"] in client.get_issue(17).labels
+    assert client.linked_pull_request_reads[17] == 1
 
 
 def test_abandoned_publication_with_multiple_prs_stays_unresolved(

@@ -270,6 +270,9 @@ from powdrr_lift.workrr.human_task import (
     run_human_task,
 )
 from powdrr_lift.workrr.local_model import download_local_qwen_model
+from powdrr_lift.workrr.planning.execution_receipts import (
+    produce_requirement_execution_receipt_manifest,
+)
 from powdrr_lift.workrr.planning_session import (
     PlanningSessionConfig,
     run_planning_session,
@@ -390,6 +393,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Delay between current-head required-check refreshes (default: 30).",
     )
     ci_response_parser.set_defaults(func=_run_respond_to_pr_ci)
+
+    receipt_producer_parser = subparsers.add_parser(
+        "publish-execution-receipts",
+        help=(
+            "Publish pinned requirement receipts from a GitHub Actions verifier "
+            "evidence input artifact."
+        ),
+    )
+    receipt_producer_parser.add_argument("--input", type=Path, required=True)
+    receipt_producer_parser.add_argument("--output", type=Path, required=True)
+    receipt_producer_parser.add_argument("--pinned-commit", required=True)
+    receipt_producer_parser.add_argument("--run-id", required=True)
+    receipt_producer_parser.add_argument(
+        "--repo-root", type=Path, help="Checkout whose HEAD must match the pin."
+    )
+    receipt_producer_parser.set_defaults(func=_run_publish_execution_receipts)
 
     publish_plan_issues_parser = subparsers.add_parser(
         "publish-plan-issues",
@@ -2769,6 +2788,82 @@ def _stage_generated_file(repo_root: Path, output_path: Path) -> None:
 def _run_repository_state(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     sys.stdout.write(render_repository_state(repo_root))
+    return 0
+
+
+def _run_publish_execution_receipts(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root).resolve()
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        if head != args.pinned_commit:
+            raise ValueError("checkout HEAD does not match --pinned-commit")
+        raw = json.loads(args.input.read_text(encoding="utf-8"))
+        expected_fields = {
+            "schema_version",
+            "candidate_tree",
+            "obligations",
+            "evidence",
+            "requirement_bindings",
+            "evidence_artifact_refs",
+        }
+        if not isinstance(raw, Mapping) or set(raw) != expected_fields:
+            raise ValueError("receipt producer input fields are invalid")
+        if raw.get("schema_version") != "verification-receipt-input-v1":
+            raise ValueError("unsupported receipt producer input schema")
+        candidate_tree = raw.get("candidate_tree")
+        obligations = raw.get("obligations")
+        evidence = raw.get("evidence")
+        requirement_bindings = raw.get("requirement_bindings")
+        artifact_refs = raw.get("evidence_artifact_refs")
+        if not isinstance(candidate_tree, str) or not candidate_tree.strip():
+            raise ValueError("receipt producer input has no candidate tree")
+        if not isinstance(obligations, list) or not all(
+            isinstance(item, Mapping) for item in obligations
+        ):
+            raise ValueError("receipt producer obligations must be objects")
+        if not isinstance(evidence, list) or not all(
+            isinstance(item, Mapping) for item in evidence
+        ):
+            raise ValueError("receipt producer evidence must be objects")
+        if not isinstance(requirement_bindings, Mapping) or not all(
+            isinstance(key, str)
+            and isinstance(value, list)
+            and all(isinstance(binding, Mapping) for binding in value)
+            for key, value in requirement_bindings.items()
+        ):
+            raise ValueError("receipt producer requirement bindings are invalid")
+        if not isinstance(artifact_refs, Mapping) or not all(
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in artifact_refs.items()
+        ):
+            raise ValueError(
+                "receipt producer evidence artifact references are invalid"
+            )
+        manifest_path = produce_requirement_execution_receipt_manifest(
+            args.output,
+            pinned_commit=args.pinned_commit,
+            candidate_tree=candidate_tree,
+            run_id=f"github:run/{args.run_id}",
+            evidence_records=evidence,
+            obligations=obligations,
+            requirement_bindings=requirement_bindings,
+            evidence_artifact_refs=artifact_refs,
+        )
+    except (
+        OSError,
+        json.JSONDecodeError,
+        subprocess.CalledProcessError,
+        ValueError,
+    ) as error:
+        print(f"could not publish execution receipts: {error}", file=sys.stderr)
+        return 2
+    print(manifest_path)
     return 0
 
 

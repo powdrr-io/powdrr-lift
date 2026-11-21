@@ -110,7 +110,7 @@ def test_runner_polls_trajectory_and_records_timeout(tmp_path: Path) -> None:
         "json.dumps({'info': {'exit_status': ''}, 'messages': ["
         "{'role': 'assistant', 'extra': {'actions': ["
         "{'command': 'pytest -q'}]}}]})); "
-        "time.sleep(1)"
+        "time.sleep(2)"
     )
 
     result = run_minisweagent(
@@ -118,7 +118,9 @@ def test_runner_polls_trajectory_and_records_timeout(tmp_path: Path) -> None:
         trajectory_path=trajectory,
         log_path=log,
         cwd=tmp_path,
-        timeout_seconds=0.1,
+        # Leave time for the subprocess to start under parallel test load before
+        # asserting that the timeout snapshot includes its first trajectory.
+        timeout_seconds=1.0,
         poll_interval=0.02,
     )
 
@@ -128,7 +130,7 @@ def test_runner_polls_trajectory_and_records_timeout(tmp_path: Path) -> None:
     timeout = next(
         record for record in records if record["kind"] == "minisweagent.timeout"
     )
-    assert timeout["timeout_seconds"] == 0.1
+    assert timeout["timeout_seconds"] == 1.0
     assert timeout["snapshot"]["tool_call_count"] == 1
 
 

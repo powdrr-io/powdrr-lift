@@ -12,6 +12,7 @@ from pathlib import Path
 from powdrr_service.planning.evidence import Evidence, EvidenceError
 from powdrr_service.verification.requirement_execution import (
     RequirementExecutionReceipt,
+    receipt_from_verification_evidence,
 )
 
 MANIFEST_SCHEMA = "requirement-execution-evidence-manifest-v1"
@@ -198,6 +199,96 @@ def write_requirement_execution_receipt_manifest(
     return manifest_path
 
 
+def produce_requirement_execution_receipt_manifest(
+    directory: Path,
+    *,
+    pinned_commit: str,
+    candidate_tree: str,
+    run_id: str,
+    evidence_records: Sequence[Mapping[str, object]],
+    obligations: Sequence[Mapping[str, object]],
+    requirement_bindings: Mapping[str, Sequence[Mapping[str, str]]],
+    evidence_artifact_refs: Mapping[str, str],
+) -> Path:
+    """Build and write receipts from an explicitly bound verifier run.
+
+    This is the producer boundary for CI integrations: the caller supplies the
+    exact plan requirement bindings, the verifier's persisted evidence and
+    obligations, and the commit/tree/run identities observed by that CI run.
+    The function performs no semantic matching or requirement inference.
+    """
+    obligations_by_id: dict[str, Mapping[str, object]] = {}
+    for obligation in obligations:
+        obligation_id = obligation.get("obligation_id")
+        if not isinstance(obligation_id, str) or not obligation_id:
+            raise EvidenceError("verification obligation has no stable ID")
+        if obligation_id in obligations_by_id:
+            raise EvidenceError("verification obligation IDs must be unique")
+        obligations_by_id[obligation_id] = obligation
+
+    evidence_by_id: dict[str, Mapping[str, object]] = {}
+    for evidence in evidence_records:
+        obligation_id = evidence.get("obligation_id")
+        if not isinstance(obligation_id, str) or not obligation_id:
+            raise EvidenceError("verification evidence has no obligation ID")
+        if obligation_id in evidence_by_id:
+            raise EvidenceError("verification evidence obligation IDs must be unique")
+        evidence_by_id[obligation_id] = evidence
+
+    receipts: list[RequirementExecutionReceipt] = []
+    bound_requirement_ids: set[str] = set()
+    for obligation_id, bindings in sorted(requirement_bindings.items()):
+        bound_obligation = obligations_by_id.get(obligation_id)
+        bound_evidence = evidence_by_id.get(obligation_id)
+        artifact_ref = evidence_artifact_refs.get(obligation_id)
+        if bound_obligation is None or bound_evidence is None or artifact_ref is None:
+            raise EvidenceError(
+                f"requirement binding {obligation_id!r} lacks observed evidence, "
+                "an obligation, or an evidence artifact reference"
+            )
+        if not bindings:
+            raise EvidenceError(
+                "requirement binding must include at least one requirement"
+            )
+        for binding in bindings:
+            requirement_id = binding.get("requirement_id")
+            requirement_digest = binding.get("requirement_digest")
+            if not isinstance(requirement_id, str) or not requirement_id:
+                raise EvidenceError("requirement binding has no stable requirement ID")
+            if requirement_id in bound_requirement_ids:
+                raise EvidenceError(
+                    f"multiple verifier results supplied for {requirement_id}"
+                )
+            if not isinstance(requirement_digest, str) or not requirement_digest:
+                raise EvidenceError(
+                    "requirement binding has no typed requirement digest"
+                )
+            bound_requirement_ids.add(requirement_id)
+            try:
+                receipt = receipt_from_verification_evidence(
+                    evidence=bound_evidence,
+                    obligation=bound_obligation,
+                    requirement_id=requirement_id,
+                    requirement_digest=requirement_digest,
+                    source_commit=pinned_commit,
+                    candidate_commit=pinned_commit,
+                    expected_candidate_tree=candidate_tree,
+                    run_id=run_id,
+                    evidence_artifact_ref=artifact_ref,
+                )
+            except (TypeError, ValueError) as error:
+                raise EvidenceError(
+                    f"could not bind verifier evidence to {requirement_id}: {error}"
+                ) from error
+            receipts.append(receipt)
+
+    if not receipts:
+        raise EvidenceError("no requirement execution receipts were produced")
+    return write_requirement_execution_receipt_manifest(
+        directory, pinned_commit=pinned_commit, receipts=receipts
+    )
+
+
 def discover_requirement_execution_receipts(
     repository: str,
     *,
@@ -311,5 +402,6 @@ __all__ = [
     "RECEIPT_ARTIFACT_NAME",
     "discover_requirement_execution_receipts",
     "load_requirement_execution_receipts",
+    "produce_requirement_execution_receipt_manifest",
     "write_requirement_execution_receipt_manifest",
 ]

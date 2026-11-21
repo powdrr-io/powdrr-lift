@@ -13,11 +13,13 @@ from powdrr_service.verification.requirement_execution import (
     requirement_coverage_digest,
 )
 
+from powdrr_lift.cli import build_parser
 from powdrr_lift.workrr.planning.execution_receipts import (
     MANIFEST_SCHEMA,
     RECEIPT_ARTIFACT_NAME,
     discover_requirement_execution_receipts,
     load_requirement_execution_receipts,
+    produce_requirement_execution_receipt_manifest,
     write_requirement_execution_receipt_manifest,
 )
 
@@ -151,6 +153,195 @@ def test_receipt_manifest_producer_rejects_unpassed_receipts(tmp_path: Path) -> 
         write_requirement_execution_receipt_manifest(
             tmp_path, pinned_commit="a" * 40, receipts=(receipt,)
         )
+
+
+def test_verification_run_producer_requires_explicit_requirement_binding(
+    tmp_path: Path,
+) -> None:
+    commit = "a" * 40
+    obligation = {
+        "obligation_id": "obligation:one",
+        "contract_id": "contract:one",
+        "provider": "pytest",
+        "selector": "tests/test_example.py::test_behavior",
+        "profile": "python-tests",
+        "contract_fingerprint": "sha256:" + "b" * 64,
+        "verifier_fingerprint": "sha256:" + "c" * 64,
+    }
+    evidence = {
+        "obligation_id": obligation["obligation_id"],
+        "contract_id": obligation["contract_id"],
+        "provider": obligation["provider"],
+        "selector": obligation["selector"],
+        "profile": obligation["profile"],
+        "contract_fingerprint": obligation["contract_fingerprint"],
+        "verifier_fingerprint": obligation["verifier_fingerprint"],
+        "candidate_tree": "tree:observed",
+        "command_fingerprint": "sha256:" + "d" * 64,
+        "status": "passed",
+        "artifact_refs": ["artifact:run/456/test-output.txt"],
+    }
+    requirement_digest = requirement_coverage_digest(
+        requirement_id="req-0001",
+        statement="The behavior is observable.",
+        kind="functional",
+        source_refs=("anchor-0001",),
+        source_group_ids=(),
+        source_validation_groups=(),
+        source_logic=(),
+    )
+
+    manifest_path = produce_requirement_execution_receipt_manifest(
+        tmp_path,
+        pinned_commit=commit,
+        candidate_tree="tree:observed",
+        run_id="github:run/456",
+        evidence_records=(evidence,),
+        obligations=(obligation,),
+        requirement_bindings={
+            obligation["obligation_id"]: (
+                {
+                    "requirement_id": "req-0001",
+                    "requirement_digest": requirement_digest,
+                },
+            )
+        },
+        evidence_artifact_refs={
+            obligation["obligation_id"]: "artifact:run/456/evidence.json"
+        },
+    )
+
+    evidence_by_requirement, excerpts = load_requirement_execution_receipts(
+        manifest_path, pinned_commit=commit
+    )
+    receipt_evidence = evidence_by_requirement["req-0001"][0]
+    receipt = json.loads(excerpts[receipt_evidence.id])
+    assert receipt["candidate_commit"] == commit
+    assert receipt["requirement_digest"] == requirement_digest
+    assert receipt["oracle_id"].startswith("oracle:")
+
+
+def test_verification_run_producer_rejects_candidate_tree_mismatch(
+    tmp_path: Path,
+) -> None:
+    obligation = {
+        "obligation_id": "obligation:one",
+        "contract_id": "contract:one",
+        "provider": "pytest",
+        "selector": "tests/test_example.py::test_behavior",
+        "profile": "python-tests",
+        "contract_fingerprint": "sha256:" + "b" * 64,
+        "verifier_fingerprint": "sha256:" + "c" * 64,
+    }
+    evidence = {
+        "obligation_id": obligation["obligation_id"],
+        "contract_id": obligation["contract_id"],
+        "provider": obligation["provider"],
+        "selector": obligation["selector"],
+        "profile": obligation["profile"],
+        "contract_fingerprint": obligation["contract_fingerprint"],
+        "verifier_fingerprint": obligation["verifier_fingerprint"],
+        "candidate_tree": "tree:other",
+        "command_fingerprint": "sha256:" + "d" * 64,
+        "status": "passed",
+        "artifact_refs": [],
+    }
+
+    with pytest.raises(EvidenceError, match="different candidate tree"):
+        produce_requirement_execution_receipt_manifest(
+            tmp_path,
+            pinned_commit="a" * 40,
+            candidate_tree="tree:expected",
+            run_id="github:run/456",
+            evidence_records=(evidence,),
+            obligations=(obligation,),
+            requirement_bindings={
+                obligation["obligation_id"]: (
+                    {
+                        "requirement_id": "req-0001",
+                        "requirement_digest": "sha256:" + "e" * 64,
+                    },
+                )
+            },
+            evidence_artifact_refs={
+                obligation["obligation_id"]: "artifact:run/456/evidence.json"
+            },
+        )
+
+
+def test_publish_execution_receipts_cli_pins_checkout_and_parses_input(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commit = "a" * 40
+    obligation = {
+        "obligation_id": "obligation:one",
+        "contract_id": "contract:one",
+        "provider": "pytest",
+        "selector": "tests/test_example.py::test_behavior",
+        "profile": "python-tests",
+        "contract_fingerprint": "sha256:" + "b" * 64,
+        "verifier_fingerprint": "sha256:" + "c" * 64,
+    }
+    evidence = {
+        "obligation_id": obligation["obligation_id"],
+        "contract_id": obligation["contract_id"],
+        "provider": obligation["provider"],
+        "selector": obligation["selector"],
+        "profile": obligation["profile"],
+        "contract_fingerprint": obligation["contract_fingerprint"],
+        "verifier_fingerprint": obligation["verifier_fingerprint"],
+        "candidate_tree": "tree:observed",
+        "command_fingerprint": "sha256:" + "d" * 64,
+        "status": "passed",
+        "artifact_refs": ["artifact:run/456/test-output.txt"],
+    }
+    binding = {
+        "requirement_id": "req-0001",
+        "requirement_digest": "sha256:" + "e" * 64,
+    }
+    input_path = tmp_path / "receipt-input.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "verification-receipt-input-v1",
+                "candidate_tree": "tree:observed",
+                "obligations": [obligation],
+                "evidence": [evidence],
+                "requirement_bindings": {obligation["obligation_id"]: [binding]},
+                "evidence_artifact_refs": {
+                    obligation["obligation_id"]: "artifact:run/456/evidence.json"
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "output"
+    monkeypatch.setattr(
+        "powdrr_lift.cli.subprocess.run",
+        lambda *_args, **_kwargs: SimpleNamespace(stdout=commit + "\n", returncode=0),
+    )
+
+    args = build_parser().parse_args(
+        [
+            "publish-execution-receipts",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_dir),
+            "--pinned-commit",
+            commit,
+            "--run-id",
+            "456",
+            "--repo-root",
+            str(tmp_path),
+        ]
+    )
+
+    assert args.func(args) == 0
+    manifest_path = output_dir / RECEIPT_ARTIFACT_NAME / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["base_commit"] == commit
+    assert manifest["receipts"][0]["receipt"]["run_id"] == "github:run/456"
 
 
 def test_discovery_downloads_only_successful_artifacts_for_exact_commit(

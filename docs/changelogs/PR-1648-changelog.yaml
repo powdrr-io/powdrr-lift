@@ -1,0 +1,98 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1648
+title: Publish pinned planner execution receipts
+intent:
+  problem: Planning can consume exact-commit execution receipts, but no supported producer joined observed verifier evidence to planner requirement bindings and published the artifact.
+  goal: Provide a GitHub Actions producer that publishes only passed verifier evidence explicitly bound to typed requirements at the exact caller commit.
+human-decisions: []
+structured_files: []
+files:
+  - path: .github/workflows/publish-requirement-execution-receipts.yml
+    type: added
+    span: {start_line: 1, end_line: 73}
+    summary: Add a reusable workflow that publishes the pinned receipt artifact.
+    rationale: Let target repositories publish receipts through GitHub Actions without a Powdrr coordination server.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 13, end_line: 16}
+    summary: Record the receipt producer and remaining target-repository setup.
+    rationale: Keep the planner audit aligned with the implemented receipt path.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 339, end_line: 349}
+    summary: Describe producer validation and artifact publication.
+    rationale: Document how exact verifier evidence becomes a planner receipt.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 354, end_line: 359}
+    summary: Clarify that each target repository supplies its verifier input.
+    rationale: Make the remaining integration boundary explicit.
+  - path: docs/guides/requirement-execution-receipts.md
+    type: added
+    span: {start_line: 1, end_line: 58}
+    summary: Specify the verifier input artifact and reusable-workflow call.
+    rationale: Give target-repository maintainers a concrete receipt publication contract.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 273, end_line: 275}
+    summary: Import the explicit receipt producer.
+    rationale: Expose the producer through the Powdrr command line.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 397, end_line: 412}
+    summary: Add the publish-execution-receipts command and inputs.
+    rationale: Let the reusable workflow invoke the validated producer.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2794, end_line: 2869}
+    summary: Validate pinned checkout and receipt input before publishing.
+    rationale: Reject malformed input and any run whose checkout differs from its declared commit.
+  - path: src/powdrr_lift/workrr/planning/execution_receipts.py
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Import the structured verifier evidence adapter.
+    rationale: Build receipts through the same obligation and candidate-tree checks used by the service schema.
+  - path: src/powdrr_lift/workrr/planning/execution_receipts.py
+    type: modified
+    span: {start_line: 202, end_line: 291}
+    summary: Join observed verifier records to explicit typed requirement bindings.
+    rationale: Keep requirement linkage deterministic and reject missing, duplicate, or mismatched evidence.
+  - path: src/powdrr_lift/workrr/planning/execution_receipts.py
+    type: modified
+    span: {start_line: 405, end_line: 405}
+    summary: Export the receipt producer.
+    rationale: Make the implementation callable by the CLI integration.
+  - path: tests/test_minisweagent_monitor.py
+    type: modified
+    span: {start_line: 113, end_line: 113}
+    summary: Extend the timeout child process runtime.
+    rationale: Preserve the test trajectory long enough for a timeout under parallel test load.
+  - path: tests/test_minisweagent_monitor.py
+    type: modified
+    span: {start_line: 121, end_line: 123}
+    summary: Allow startup time before the timeout-monitor assertion.
+    rationale: Avoid treating xdist scheduling pressure as a missing trajectory.
+  - path: tests/test_minisweagent_monitor.py
+    type: modified
+    span: {start_line: 133, end_line: 133}
+    summary: Assert the updated timeout value.
+    rationale: Keep the expected diagnostic aligned with the longer startup allowance.
+  - path: tests/test_planning_execution_receipts.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Import the CLI parser for producer command coverage.
+    rationale: Verify the published command is reachable through the user-facing CLI.
+  - path: tests/test_planning_execution_receipts.py
+    type: modified
+    span: {start_line: 22, end_line: 22}
+    summary: Import the producer function for focused tests.
+    rationale: Exercise deterministic receipt generation directly.
+  - path: tests/test_planning_execution_receipts.py
+    type: modified
+    span: {start_line: 158, end_line: 346}
+    summary: Cover explicit binding, candidate-tree rejection, and CLI commit pinning.
+    rationale: Ensure only observed, matching evidence is serialized into the receipt artifact.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

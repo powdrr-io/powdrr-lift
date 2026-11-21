@@ -535,7 +535,7 @@ class SourceLedgerQuestionMachine:
         self.taxonomy_entity_types = taxonomy_entity_types
         self._invalid_accepted_question_ids: set[str] = set()
         self._accepted_question_input_digests: dict[str, str] | None = None
-        self._oversized_work_unit_groups: set[tuple[str, ...]] = set()
+        self._work_unit_groups_to_split: set[tuple[str, ...]] = set()
         self._max_question_frontier: int | None = None
         self._single_proposal_requirements: set[str] = set()
         self._supplemental_work_unit_requirements: set[str] = set()
@@ -576,9 +576,9 @@ class SourceLedgerQuestionMachine:
         """Accepted answers that no longer satisfy the current parser contract."""
         return frozenset(self._invalid_accepted_question_ids)
 
-    def set_oversized_work_unit_groups(self, groups: Sequence[Sequence[str]]) -> None:
-        """Split only requirement groups whose previous response exceeded the cap."""
-        self._oversized_work_unit_groups = {
+    def set_work_unit_groups_to_split(self, groups: Sequence[Sequence[str]]) -> None:
+        """Split requirement groups after oversized or incomplete responses."""
+        self._work_unit_groups_to_split = {
             tuple(group) for group in groups if len(group) > 1
         }
         self._single_proposal_requirements = {
@@ -1189,7 +1189,7 @@ class SourceLedgerQuestionMachine:
             group = unresolved[
                 offset : offset + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
             ]
-            if group in self._oversized_work_unit_groups:
+            if group in self._work_unit_groups_to_split:
                 groups.extend((requirement_id,) for requirement_id in group)
             else:
                 groups.append(group)
@@ -1566,7 +1566,7 @@ class SourceLedgerQuestionMachine:
             str(workflow_directory),
             assembly_answers,
             accepted_digests,
-            tuple(sorted(self._oversized_work_unit_groups)),
+            tuple(sorted(self._work_unit_groups_to_split)),
             tuple(sorted(self._single_proposal_requirements)),
             tuple(sorted(self._supplemental_work_unit_requirements)),
         )

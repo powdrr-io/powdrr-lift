@@ -1091,8 +1091,8 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
         for item in explicitly_unindexed_request.repository_evidence
     )
     batches = batch_question_requests(small_context_requests)
-    assert len(batches) == 4
-    assert all(not batch.batch_members for batch in batches)
+    assert len(batches) == 2
+    assert [len(batch.batch_members) for batch in batches] == [2, 2]
 
     first_group_evidence_ids = {
         record.id
@@ -1265,14 +1265,14 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
         for requirement_id in proposal.requirement_ids
     } == set(requirement_ids)
 
-    machine.set_oversized_work_unit_groups((requirement_ids,))
+    machine.set_work_unit_groups_to_split((requirement_ids,))
     split_requests = machine._work_unit_requests({})
     assert tuple(
         request.question.subject_ids
         for request in split_requests
         if request is not None
     ) == tuple((requirement_id,) for requirement_id in requirement_ids)
-    machine.set_oversized_work_unit_groups((requirement_ids, ("req-0016",)))
+    machine.set_work_unit_groups_to_split((requirement_ids, ("req-0016",)))
     single_request = next(
         request
         for request in machine._work_unit_requests({})

@@ -265,7 +265,7 @@ def _replay_planning_answers(
 ) -> tuple[dict[str, Mapping[str, Any]], dict[str, str], list[tuple[str, ...]]]:
     accepted: dict[str, Mapping[str, Any]] = {}
     input_digests: dict[str, str] = {}
-    oversized_work_unit_groups: list[tuple[str, ...]] = []
+    work_unit_groups_to_split: list[tuple[str, ...]] = []
     for event in events:
         question = event.payload.get("question")
         if not isinstance(question, Mapping):
@@ -289,12 +289,16 @@ def _replay_planning_answers(
                 question.get("kind") == "propose_work_units"
                 and isinstance(validation_result, Mapping)
                 and isinstance(validation_result.get("message"), str)
-                and validation_result["message"].startswith("serialized answer is ")
+                and (
+                    validation_result["message"].startswith("serialized answer is ")
+                    or validation_result["message"].startswith("batch response ")
+                    or isinstance(event.payload.get("batch_question_id"), str)
+                )
                 and isinstance(subject_ids, list)
                 and all(isinstance(item, str) for item in subject_ids)
             ):
-                oversized_work_unit_groups.append(tuple(subject_ids))
-    return accepted, input_digests, oversized_work_unit_groups
+                work_unit_groups_to_split.append(tuple(subject_ids))
+    return accepted, input_digests, work_unit_groups_to_split
 
 
 class PlanningStateMachine(Protocol):
@@ -559,15 +563,13 @@ def advance_planning_session(
             f"planning journal is {journal.status}; select a valid checkpoint "
             "before continuing"
         )
-    accepted, accepted_input_digests, oversized_work_unit_groups = (
+    accepted, accepted_input_digests, work_unit_groups_to_split = (
         _replay_planning_answers(journal.events)
     )
 
-    set_oversized_groups = getattr(
-        state_machine, "set_oversized_work_unit_groups", None
-    )
-    if callable(set_oversized_groups):
-        set_oversized_groups(oversized_work_unit_groups)
+    set_groups_to_split = getattr(state_machine, "set_work_unit_groups_to_split", None)
+    if callable(set_groups_to_split):
+        set_groups_to_split(work_unit_groups_to_split)
 
     set_accepted_input_digests = getattr(
         state_machine, "set_accepted_question_input_digests", None
@@ -746,6 +748,7 @@ def advance_planning_session(
                                 if isinstance(error, PlanningContractError)
                                 else PlanningContractError("/", str(error)),
                                 dict(raw_answer),
+                                request.question.question_id,
                             )
                         )
                     else:
@@ -775,6 +778,7 @@ def advance_planning_session(
                             "/answers", "batch response has an invalid answer list"
                         ),
                         {},
+                        request.question.question_id,
                     )
                     for member in request.batch_members
                 )
@@ -792,6 +796,7 @@ def advance_planning_session(
                                 "batch response omitted a valid answer for this member",
                             ),
                             {},
+                            request.question.question_id,
                         )
                     )
                     continue
@@ -806,6 +811,7 @@ def advance_planning_session(
                             if isinstance(error, PlanningContractError)
                             else PlanningContractError("/", str(error)),
                             dict(raw_answer),
+                            request.question.question_id,
                         )
                     )
                 else:
@@ -867,6 +873,7 @@ def advance_planning_session(
                 error=result.error,
                 previous_answer=result.previous_answer,
                 id_counters=journal.id_counters,
+                batch_question_id=result.batch_question_id,
                 code_evidence_refs=code_evidence_by_question_id.get(
                     result.question.question_id, ()
                 ),
@@ -1428,14 +1435,14 @@ def planning_operation_executor(
                 raise PlanningJournalError(
                     f"planning journal is {journal.status}; select a valid checkpoint"
                 )
-            accepted, input_digests, oversized_groups = _replay_planning_answers(
+            accepted, input_digests, groups_to_split = _replay_planning_answers(
                 journal.events
             )
-            set_oversized_groups = getattr(
-                state_machine, "set_oversized_work_unit_groups", None
+            set_groups_to_split = getattr(
+                state_machine, "set_work_unit_groups_to_split", None
             )
-            if callable(set_oversized_groups):
-                set_oversized_groups(oversized_groups)
+            if callable(set_groups_to_split):
+                set_groups_to_split(groups_to_split)
             set_input_digests = getattr(
                 state_machine, "set_accepted_question_input_digests", None
             )

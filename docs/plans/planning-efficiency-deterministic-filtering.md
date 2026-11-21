@@ -711,6 +711,23 @@ produced by the validated review scheduler, preserving checkpointed decisions
 and their exact IDs. The typical, large, and Structrr-stress deterministic
 profiles now complete and satisfy their fixture checks.
 
+### Bounded work-unit proposal batches (2026-11-21)
+
+Independent `propose_work_units` questions now batch in pairs. The combined
+batch input limit is 32,000 characters, while each member remains subject to
+the existing 24,000-character question limit. Each answer is still parsed and
+validated against its original member schema and question ID. If a member from
+a batch fails validation, the checkpoint records the parent batch question ID;
+replay then splits that requirement group into singleton questions. This keeps
+the retry targeted and prevents a malformed batch from being issued unchanged.
+
+On the deterministic large profile, work-unit proposal calls fell from 125 to
+63, and total provider calls fell from 303 to 241 (20.5%). Local elapsed time
+fell from 10.547 to 8.781 seconds (16.7%) on the synthetic-answer fixture. This
+is deterministic benchmark evidence only. Live-provider behavior still needs
+evaluation because prior live responses have omitted requested proposal groups;
+the call reduction does not establish semantic completeness.
+
 ## Cross-cutting test requirements
 
 - Use mocked nontrivial provider responses. Do not use live-model calls as the only proof that a contract works.

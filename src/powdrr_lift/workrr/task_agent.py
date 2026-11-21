@@ -146,6 +146,7 @@ from powdrr_service.verification.test_obligations import (
 )
 
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
+from powdrr_lift.change_log_template import diff_hunk_spans
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.execution_plan import ExecutionUnit
@@ -3075,12 +3076,7 @@ def _issue_worker_pr_changelog(
                 f"could not read published diff for changelog path {path!r}: "
                 f"{diff.stderr.strip() or diff.stdout.strip()}"
             )
-        spans = [
-            (int(match.group(1)), int(match.group(2) or "1"))
-            for line in diff.stdout.splitlines()
-            if (match := re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line))
-            and int(match.group(2) or "1") > 0
-        ]
+        spans = diff_hunk_spans(diff.stdout)
         if not spans:
             raise PowdrrExecutionError(
                 f"published diff has no source span for changelog path {path!r}"
@@ -3091,12 +3087,12 @@ def _issue_worker_pr_changelog(
                 "type": "modified" if existed else "added",
                 "span": {
                     "start_line": start,
-                    "end_line": start + count - 1,
+                    "end_line": end,
                 },
                 "summary": f"Changed as part of {title}.",
                 "rationale": objective,
             }
-            for start, count in spans
+            for start, end in spans
         )
     generated_path = f"docs/changelogs/PR-{pr_number}-changelog.yaml"
     product_paths = [path for path in files_to_publish if path != generated_path]

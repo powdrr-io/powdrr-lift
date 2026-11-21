@@ -15,7 +15,26 @@ from powdrr_lift import (
     create_change_log_template,
     create_change_log_template_from_plan_diff,
 )
+from powdrr_lift.change_log_template import diff_hunk_spans
 from powdrr_lift.core.template_generation import merge_existing_template_content
+
+
+def test_diff_hunk_spans_include_deletion_only_hunks() -> None:
+    diff = (
+        "@@ -378,3 +378,2 @@ generate_signing_key\n"
+        "@@ -384,6 +383,14 @@ generate_block_obligation_fixture\n"
+        "@@ -391 +397,0 @@ generate_block_obligation_fixture\n"
+        "@@ -415 +421 @@ generate_block_obligation_fixture\n"
+        "@@ -445,2 +452,0 @@ generate_block_obligation_fixture\n"
+    )
+
+    assert diff_hunk_spans(diff) == [
+        (378, 379),
+        (383, 396),
+        (391, 391),
+        (421, 421),
+        (445, 446),
+    ]
 
 
 def test_template_value_preservation_uses_service_merge_policy() -> None:

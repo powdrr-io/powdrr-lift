@@ -147,13 +147,21 @@ def test_issue_worker_changelog_validates_against_the_published_branch(
     git("config", "user.name", "Powdrr Test", cwd=repo)
     git("config", "user.email", "powdrr-test@example.invalid", cwd=repo)
     readme = repo / "README.md"
-    readme.write_text("first line\noriginal second line\n", encoding="utf-8")
+    readme.write_text(
+        "first line\noriginal second line\nunchanged third line\n"
+        "unchanged fourth line\nremoved fifth line\n",
+        encoding="utf-8",
+    )
     git("add", "README.md", cwd=repo)
     git("commit", "-m", "initial", cwd=repo)
     git("remote", "add", "origin", str(remote), cwd=repo)
     git("push", "-u", "origin", "main", cwd=repo)
     git("switch", "-c", "powdrr/demo", cwd=repo)
-    readme.write_text("first line\nupdated second line\n", encoding="utf-8")
+    readme.write_text(
+        "first line\nupdated second line\nunchanged third line\n"
+        "unchanged fourth line\n",
+        encoding="utf-8",
+    )
     git("add", "README.md", cwd=repo)
     git("commit", "-m", "update readme", cwd=repo)
     git("push", "-u", "origin", "powdrr/demo", cwd=repo)
@@ -178,7 +186,14 @@ def test_issue_worker_changelog_validates_against_the_published_branch(
             "span": {"start_line": 2, "end_line": 2},
             "summary": "Changed as part of Update the README.",
             "rationale": "Keep the README current.",
-        }
+        },
+        {
+            "path": "README.md",
+            "type": "modified",
+            "span": {"start_line": 5, "end_line": 5},
+            "summary": "Changed as part of Update the README.",
+            "rationale": "Keep the README current.",
+        },
     ]
 
 

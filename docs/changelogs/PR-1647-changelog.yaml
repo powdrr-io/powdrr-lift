@@ -1,0 +1,41 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1647
+title: Handle redacted private PR repository identity
+intent:
+  problem: GitHub may return an empty headRepository.nameWithOwner for a same-repository pull request in a private repository, causing Powdrr to skip deterministic validation-baseline refresh.
+  goal: Identify same-repository PR heads using available owner and repository metadata when nameWithOwner is redacted, while continuing to reject fork heads.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4747, end_line: 4769}
+    summary: Add a private-repository-safe same-repository head identity check.
+    rationale: Continue deterministic validation-baseline recovery when GitHub redacts the combined repository name.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4784, end_line: 4784}
+    summary: Request pull request head repository owner metadata from GitHub.
+    rationale: Provide the owner login needed to identify a same-repository private PR head.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4800, end_line: 4800}
+    summary: Read the repository owner metadata returned for the PR head.
+    rationale: Use GitHub’s separate owner field when nameWithOwner is unavailable.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4810, end_line: 4812}
+    summary: Gate baseline refresh on the robust repository identity comparison.
+    rationale: Allow same-repository refreshes without permitting a fork to push changes to the target PR branch.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 3958, end_line: 4062}
+    summary: Cover normal, redacted-private, and mismatched PR head repository identities and verify refresh proceeds for the private-repository response.
+    rationale: Prevent private repository metadata redaction from silently blocking validation-baseline recovery.
+entities: []
+entity_relationships: []
+invariants:
+  - id: private-pr-baseline-refresh-requires-proven-same-repository
+    description: Powdrr may refresh a PR validation baseline only after the head repository identity matches the target repository, using head repository owner and name when GitHub redacts nameWithOwner.
+    action: added
+guidance: []

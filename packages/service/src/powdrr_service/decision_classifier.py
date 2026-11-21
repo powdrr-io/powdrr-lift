@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 import uuid
 from abc import ABC, abstractmethod
@@ -115,6 +116,17 @@ class _DecisionApiSemanticClassifierClient(DecisionProvider):
             or self.default_model
         )
         self._fail_closed = fail_closed
+        self._usage_local = threading.local()
+
+    @property
+    def last_usage(self) -> dict[str, Any]:
+        """Provider usage for the current thread's most recent request."""
+        usage = getattr(self._usage_local, "last_usage", None)
+        return dict(usage) if isinstance(usage, Mapping) else {}
+
+    @last_usage.setter
+    def last_usage(self, usage: Mapping[str, Any] | None) -> None:
+        self._usage_local.last_usage = dict(usage) if isinstance(usage, Mapping) else {}
 
     @property
     def model(self) -> str:
@@ -133,6 +145,7 @@ class _DecisionApiSemanticClassifierClient(DecisionProvider):
         response_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         request_id = uuid.uuid4().hex
+        self.last_usage = None
         endpoint_host = urlsplit(self._endpoint).hostname or "unknown"
         request_data = _classifier_request(messages, response_schema)
         if not self._api_key:
@@ -174,6 +187,7 @@ class _DecisionApiSemanticClassifierClient(DecisionProvider):
             response = retry_transient_http(
                 lambda: self._call(request_data, self._api_key or "", self._endpoint)
             )
+            self.last_usage = response.get("usage")
             answer = response.get("answer", response)
             returned_model = response.get("model", self._model)
             LOGGER.warning(
@@ -221,6 +235,7 @@ class _DecisionApiSemanticClassifierClient(DecisionProvider):
         return result
 
     def _execute_batch(self, batch: list[_PendingDecision]) -> None:
+        self.last_usage = None
         batch_id = uuid.uuid4().hex
         endpoint_host = urlsplit(self._endpoint).hostname or "unknown"
         started_at = min(item.started_at for item in batch)
@@ -248,11 +263,13 @@ class _DecisionApiSemanticClassifierClient(DecisionProvider):
                 response = {
                     "answers": {item.request_id: answer},
                     "model": single_response.get("model", self._model),
+                    "usage": single_response.get("usage"),
                 }
             else:
                 response = retry_transient_http(
                     lambda: self._call_batch(batch, self._api_key or "", self._endpoint)
                 )
+            self.last_usage = response.get("usage")
             phase = "response_mapping"
             returned_model = response.get("model", self._model)
             answers = response.get("answers")

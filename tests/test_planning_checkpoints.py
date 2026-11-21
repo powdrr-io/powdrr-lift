@@ -884,6 +884,15 @@ def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
                     "made_progress": True,
                 }
             ],
+            "provider_calls": [
+                {
+                    "outcome": "accepted",
+                    "prompt_tokens": 12,
+                    "completion_tokens": 8,
+                    "cost_amount": 0.012 if index == 999 else None,
+                    "cost_currency": "USD" if index == 999 else None,
+                }
+            ],
         }
 
     for index in range(1_000):
@@ -921,6 +930,14 @@ def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
     summary = store.summary(current_run_id=current_run)
 
     assert summary["questions"] == 1_000
+    assert summary["provider_calls"] == 1_000
+    assert summary["reported_cost"] == {
+        "status": "partial",
+        "known_subtotal": 0.012,
+        "currency": "USD",
+        "reported_calls": 1,
+        "unreported_calls": 999,
+    }
     assert summary["api_calls"] == 1_000
     assert summary["token_usage_known"] is False
     assert summary["by_question_kind"]["extract_requirements"]["questions"] == 1_000
@@ -946,6 +963,25 @@ def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
     assert summary["runs"][0]["questions"] == 700
     assert summary["runs"][1]["questions"] == 300
     assert len(summary["largest_calls"]) == 10
+
+    legacy_metric = metric(1_001)
+    legacy_metric.pop("provider_calls")
+    with store.path.open("a", encoding="utf-8") as stream:
+        stream.write(
+            json.dumps(
+                {
+                    "schema": "planning-call-telemetry-v2",
+                    "session_id": store.session_id,
+                    "run_id": prior_run,
+                    **legacy_metric,
+                }
+            )
+            + "\n"
+        )
+    legacy_summary = store.summary()
+    assert legacy_summary["questions"] == 1_001
+    assert legacy_summary["reported_cost"]["status"] == "partial"
+    assert legacy_summary["reported_cost"]["unreported_calls"] == 1_000
     persisted = store.path.read_text(encoding="utf-8")
     assert "source_text" not in persisted
     assert "The exact question text" not in persisted

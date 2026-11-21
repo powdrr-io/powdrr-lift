@@ -1,6 +1,6 @@
 # Planning: LLM interaction and determinism audit
 
-Status: audited recommendations; the first removal milestone (P07/P09),
+Status: audited recommendations; milestones 1–2 are implemented. The first removal milestone (P07/P09),
 deterministic source-extraction paging, deterministic work-unit proposal
 progression, deterministic runtime/component/validation and zero-or-one phase
 bindings, deterministic batch answer-ID binding, P11/P13 existing-subject review
@@ -14,7 +14,13 @@ classification remains necessary for other evidence. A producer command and
 reusable GitHub Actions workflow now publish exact-commit artifacts from explicit
 verifier evidence and requirement bindings. Target repositories still need to
 connect their verifier job to the documented input artifact contract.
-Other work in milestones 2–6 is still proposed.
+Milestone 3 remains partial because arbitrary nested source logic still needs
+semantic interpretation and executable coverage. Milestones 4–5 have their
+deterministic compilation and receipt-validation paths; edge-case tests are
+present, while semantic relevance judgments remain model-backed. Milestone 6
+records provider-reported usage and cost per call, including decision batches,
+without storing prompt or response text. Exact message retention is not required
+for the audit and remains disabled in planning telemetry.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
 `origin/main` on 2026-11-17. This is a static source audit, not a measured live
@@ -762,10 +768,10 @@ check public API/test consumers explicitly; this audit changes none of them.
    subjects still need semantic content proposals. Ordered structural edits across
    PR items now compile to one deterministic baseline-to-final delta while each
    item retains its predecessor snapshot; unordered edits to the same subject still
-   fail. Continue testing false path/name correlations, dynamic/partial symbol
-   coverage, graph cycles, superseded source and contradictory projected states.
-   Test false path/name correlations, dynamic/partial symbol coverage, graph cycles,
-   superseded source and contradictory projected states.
+   fail. Existing tests cover false path/name correlation, dynamic and partial
+   symbol coverage, dependency cycles, superseded source, and contradictory
+   projected states. Treat those cases as verified coverage rather than remaining
+   work.
 5. **Improve coverage/oracle evidence before removing semantic reviews.** Use
    requirement-bound receipts, executable checks, registered boundary adapters,
    typed case compilation and provenance. Receipt evidence is now validated in
@@ -788,23 +794,34 @@ check public API/test consumers explicitly; this audit changes none of them.
    Do not add a second planner to bypass deterministic compilation failures.
 
 The request catalog describes the audited revision. Milestones 1–2 are
-implemented in the current planner. Multi-phase assignment remains a semantic
-model decision; milestone 3 is partially implemented, and milestones 4–5 remain
-recommendations.
-Milestone 6 has baseline call accounting and per-question gate attribution;
-provider-reported cost and any decision to retain exact request/response content
-remain open.
+implemented. Multi-phase assignment remains a semantic model decision, and
+milestone 3 remains partial until source-logic interpretation has complete
+executable coverage. Milestones 4–5 are implemented for deterministic
+compilation and receipt validation; semantic relevance judgments remain bounded
+model decisions. Milestone 6 now has per-question attribution, provider-reported
+usage/cost capture, and backward-compatible local summaries. The audit does
+not retain raw prompts or answers. Remaining work is to close M3 source-logic
+coverage gaps and measure live planning quality, latency, and cost.
+
+Provider-usage update: planning telemetry now preserves per-call token and cost
+fields when a provider reports them. Decision-provider responses carry their
+usage through the planner adapter. Batch usage is attached once to the batch
+record and is not assigned to an individual member. Local summaries report a
+known subtotal, currency, and whether cost coverage is complete, partial,
+unknown, or spans currencies. Existing v1/v2 journals remain readable. No cost
+is estimated from model pricing, and exact prompts/responses are not retained.
 Later changes should be separately reviewable and retain pinned intent, private
 verification, full scenario closure and explicit human decision boundaries.
 
 ## 12. Measurement, gaps and handoff
 
 This audit does not measure actual provider routing, run cost/latency, precision
-of classification or exhaustive semantic equivalence. A complete run report must
-retain exact messages plus schema and model/provider/policy, logical question ID,
-accepted input/evidence digests, batch correlation, semantic/transport retry reason,
-raw/parsed answer, deterministic rule ID/replay hit and downstream acceptance.
-Private credentials and verifier data remain protected.
+of classification or exhaustive semantic equivalence. A run report can support
+that work with schema and model/provider/policy, logical question ID, accepted
+input/evidence digests, batch correlation, retry reason, token/cost usage,
+deterministic rule ID/replay hit and downstream acceptance. Raw messages and
+answers are not needed for this audit and remain outside the planning telemetry
+journal. Private credentials and verifier data remain protected.
 
 The default planning route has thirteen business question families plus three
 wrapper families. Nine dormant builders and eight older direct completion sites

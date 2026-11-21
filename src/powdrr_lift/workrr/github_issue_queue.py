@@ -250,6 +250,7 @@ class _ItemClaim:
         worker_id: str,
         scopes: Sequence[str],
         max_concurrency: int,
+        work_item_identity: Mapping[str, Any] | None = None,
     ) -> None:
         self.repo_root = repo_root
         self.issue_number = issue_number
@@ -263,6 +264,7 @@ class _ItemClaim:
             else normalized_scopes
         )
         self.max_concurrency = max_concurrency
+        self.work_item_identity = dict(work_item_identity or {})
         self.directory = _worker_store_root(repo_root) / "claims"
         self.claim_path = self.directory / f"issue-{issue_number}.json"
         self.registry_path = self.directory / "scope-claims.json"
@@ -434,6 +436,7 @@ class _ItemClaim:
             "state": state,
             "recovery_state": recovery_state,
             "scopes": list(self.scopes),
+            "work_item_identity": self.work_item_identity,
         }
         _atomic_write_json(self.claim_path, document)
 
@@ -1712,12 +1715,23 @@ def run_worker_once(
                         )
                     )
                 )
+                from powdrr_service.planning.repair import item_input_contract_digest
+
                 claim = _ItemClaim(
                     root,
                     issue.number,
                     worker_id,
                     item.allowed_paths,
                     max_concurrency,
+                    {
+                        "repository": client.repository,
+                        "issue_number": issue.number,
+                        "plan_id": plan.plan_id,
+                        "item_id": item.item_id,
+                        "input_contract_digest": item_input_contract_digest(
+                            item, plan.planning
+                        ),
+                    },
                 )
                 try:
                     claim.__enter__()

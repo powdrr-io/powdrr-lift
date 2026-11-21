@@ -24,7 +24,12 @@ files:
     rationale: Make identity available to a replacement worker after a crash.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 1718, end_line: 1727}
+    span: {start_line: 1718, end_line: 1719}
+    summary: Load the canonical input contract digest before claiming the item.
+    rationale: Bind ownership to the reviewed contract version.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1726, end_line: 1734}
     summary: Bind a new claim to repository, issue, plan item, and current input contract.
     rationale: Ensure ownership refers to the reviewed item version.
   - path: tests/test_github_issue_queue.py

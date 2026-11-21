@@ -237,7 +237,10 @@ def test_implementation_publication_request_renders_typed_evidence() -> None:
                             "long title "
                             "that must be shortened to GitHub's title limit"
                         ),
-                        "objective": "Deliver the reviewed behavior.",
+                        "objective": (
+                            "Deliver the allocated implementation units for "
+                            "the attestation repository."
+                        ),
                         "scope": ["Update the implementation.", "Add focused tests."],
                         "acceptance_criteria": ["The behavior matches the plan."],
                     }
@@ -275,7 +278,10 @@ def test_implementation_publication_request_renders_typed_evidence() -> None:
     assert context["base-branch"] == "main"
     assert context["publication-branch"] == "powdrr/feature-17-pr-04-implementation"
     assert sections == {
-        "objective": "Deliver the reviewed behavior.",
+        "objective": (
+            "Implement a reviewed change with a deliberately long title that "
+            "must be shortened to GitHub's title limit: The behavior matches the plan."
+        ),
         "scope": "- Update the implementation.\n- Add focused tests.",
         "implementation_details": (
             "Changed files:\n- `src/feature.py`\n- `tests/test_feature.py`"
@@ -287,6 +293,19 @@ def test_implementation_publication_request_renders_typed_evidence() -> None:
     assert result["user_request"] == (
         "Implement the reviewed plan item: Implement a reviewed change with a "
         "deliberately long title that must be shortened to GitHub's title limit."
+    )
+
+
+def test_implementation_objective_preserves_functional_plan_description() -> None:
+    objective = "Reject invalid terminal job-state transitions."
+
+    assert (
+        clean_pr_publisher_module._implementation_objective(
+            objective,
+            "Implement terminal state validation",
+            ["Invalid terminal-to-passed transitions are rejected."],
+        )
+        == objective
     )
 
 

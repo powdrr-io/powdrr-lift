@@ -1,0 +1,28 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1645
+title: Define versioned GitHub worker work-item state
+intent:
+  problem: Worker attempts and GitHub work-item outcomes can disagree after interrupted or partially completed runs.
+  goal: Define a versioned state representation that preserves item identity and prevents uncertain publication or stale CI from establishing fulfillment.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/github_worker_state.py
+    type: added
+    span: {start_line: 1, end_line: 147}
+    summary: Define validated work-item identity, attempt and item outcomes, publication candidates, CI binding, and evidence confidence.
+    rationale: Establish shared authoritative state primitives for protocol consumers.
+  - path: tests/test_github_worker_state.py
+    type: added
+    span: {start_line: 1, end_line: 75}
+    summary: Cover failed attempts after publication, ambiguous candidates, stale and unbound CI, legacy unknown evidence, and serialization.
+    rationale: Prevent inconsistent or unbound evidence from advancing work-item state.
+entities:
+  - id: github-worker-work-item-state
+    type: Technical specification
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

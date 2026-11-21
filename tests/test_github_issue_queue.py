@@ -56,24 +56,33 @@ def test_item_claim_is_exclusive_and_recovery_increments_generation(
     tmp_path: Path,
 ) -> None:
     claim_path = _worker_store_root(tmp_path) / "claims" / "issue-17.json"
-    first = _ItemClaim(tmp_path, 17, "worker-a", ("src/a.py",), 2)
+    identity = {
+        "repository": "powdrr-io/example",
+        "issue_number": 17,
+        "plan_id": "plan",
+        "item_id": "item-1",
+        "input_contract_digest": "sha256:" + "a" * 64,
+    }
+    first = _ItemClaim(tmp_path, 17, "worker-a", ("src/a.py",), 2, identity)
     with first:
         assert first.generation == 1
         with pytest.raises(Timeout):
             with _ItemClaim(tmp_path, 17, "worker-b", ("src/a.py",), 2):
                 pytest.fail("a second worker acquired an active item claim")
         claim_record = json.loads(claim_path.read_text(encoding="utf-8"))
+        assert claim_record["work_item_identity"] == identity
         claim_record["generation"] += 1
         claim_path.write_text(json.dumps(claim_record), encoding="utf-8")
         with pytest.raises(GitHubIssueQueueError, match="lost claim generation"):
             first.assert_current()
-    recovered = _ItemClaim(tmp_path, 17, "worker-b", ("src/a.py",), 2)
+    recovered = _ItemClaim(tmp_path, 17, "worker-b", ("src/a.py",), 2, identity)
     with recovered:
         assert recovered.generation == 2
         record = json.loads(claim_path.read_text(encoding="utf-8"))
         assert record["owner"] == "worker-b"
         assert record["attempt_id"] == recovered.attempt_id
         assert record["recovery_state"] == "fresh"
+        assert record["work_item_identity"] == identity
 
 
 def test_item_claims_allow_disjoint_scopes_and_serialize_overlaps(

@@ -434,6 +434,62 @@ def validate_v2_verification(
                         )
                     )
 
+        try:
+            requirement_bindings = parse_changelog_sequence(
+                raw_case.get("requirement_bindings")
+            )
+        except ValueError:
+            requirement_bindings = ()
+            issues.append(
+                ChangelogValidationIssue(
+                    "required_test_case_requirement_bindings_invalid",
+                    f"Required test case {index} requirement bindings must be a list.",
+                    f"{path}.requirement_bindings",
+                )
+            )
+        seen_requirement_ids: set[str] = set()
+        for binding_index, binding in enumerate(requirement_bindings):
+            binding_path = f"{path}.requirement_bindings[{binding_index}]"
+            if not isinstance(binding, Mapping) or set(binding) != {
+                "requirement_id",
+                "requirement_digest",
+            }:
+                issues.append(
+                    ChangelogValidationIssue(
+                        "required_test_case_requirement_binding_invalid",
+                        "Requirement binding must contain only requirement_id and "
+                        "requirement_digest.",
+                        binding_path,
+                    )
+                )
+                continue
+            requirement_id = binding.get("requirement_id")
+            requirement_digest = binding.get("requirement_digest")
+            if (
+                not isinstance(requirement_id, str)
+                or not re.fullmatch(r"[A-Za-z][A-Za-z0-9:._/-]{0,199}", requirement_id)
+                or requirement_id in seen_requirement_ids
+            ):
+                issues.append(
+                    ChangelogValidationIssue(
+                        "required_test_case_requirement_id_invalid",
+                        "Requirement binding must have a unique stable requirement ID.",
+                        binding_path,
+                    )
+                )
+            elif isinstance(requirement_id, str):
+                seen_requirement_ids.add(requirement_id)
+            if not isinstance(requirement_digest, str) or not re.fullmatch(
+                r"sha256:[a-f0-9]{64}", requirement_digest
+            ):
+                issues.append(
+                    ChangelogValidationIssue(
+                        "required_test_case_requirement_digest_invalid",
+                        "Requirement binding digest must be a SHA-256 digest.",
+                        binding_path,
+                    )
+                )
+
     for index, raw_run in enumerate(
         parse_changelog_sequence(raw_verification.get("validation_runs")),
         start=1,

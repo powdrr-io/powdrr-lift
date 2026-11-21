@@ -1462,6 +1462,23 @@ def test_issue_worker_persists_only_structrr_changelog_diff(
             "item_id": "item-0003",
             "title": "Add verifier",
             "objective": "Provide a verifier component.",
+            "requirement_bindings": [
+                {
+                    "requirement_id": "req-01",
+                    "requirement_digest": "sha256:" + "a" * 64,
+                }
+            ],
+            "test_case_requirement_bindings": [
+                {
+                    "test_case_id": "AC-01",
+                    "requirement_bindings": [
+                        {
+                            "requirement_id": "req-01",
+                            "requirement_digest": "sha256:" + "a" * 64,
+                        }
+                    ],
+                }
+            ],
         },
         proposal,
         base_commit=base_commit,
@@ -1499,11 +1516,43 @@ def test_issue_worker_persists_only_structrr_changelog_diff(
     assert changelog.verification.required_test_cases[0].selectors == [
         "tests/test_add_verifier.py::test_verify"
     ]
+    assert changelog.verification.required_test_cases[0].requirement_bindings == [
+        {
+            "requirement_id": "req-01",
+            "requirement_digest": "sha256:" + "a" * 64,
+        }
+    ]
     assert changelog.verification.validation_runs[0].status == "passed"
     artifact_dir = repo_root / "docs/structrr/diffs/feature-v1/item-0003"
     assert sorted(path.name for path in artifact_dir.iterdir()) == [
         "structrr-diff.yaml"
     ]
+
+
+def test_issue_worker_rejects_requirement_binding_digest_drift() -> None:
+    with pytest.raises(PowdrrExecutionError, match="unallocated or duplicate"):
+        task_agent._validated_test_case_requirement_bindings(
+            {
+                "requirement_bindings": [
+                    {
+                        "requirement_id": "req-01",
+                        "requirement_digest": "sha256:" + "a" * 64,
+                    }
+                ],
+                "test_case_requirement_bindings": [
+                    {
+                        "test_case_id": "case-01",
+                        "requirement_bindings": [
+                            {
+                                "requirement_id": "req-01",
+                                "requirement_digest": "sha256:" + "b" * 64,
+                            }
+                        ],
+                    }
+                ],
+            },
+            planned_case_ids={"case-01"},
+        )
 
 
 def test_issue_worker_blocks_file_addition_overlap_before_structrr_bootstrap(

@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1650
+change_id: 1651
 title: Discover abandoned claims without queue labels
 intent:
   problem: An open issue with an abandoned durable worker claim can become invisible when its queue label is missing or stale.

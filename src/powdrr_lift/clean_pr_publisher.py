@@ -269,6 +269,7 @@ def _render_implementation_publication_request(
         proposed.get("acceptance_criteria"),
         "proposed_pr_context.acceptance_criteria",
     )
+    objective = _implementation_objective(objective, title_source, criteria)
     changed_paths = _required_text_list(
         implementation_result.get("changed_paths"),
         "implementation_result.changed_paths",
@@ -294,6 +295,24 @@ def _render_implementation_publication_request(
         user_request=f"Implement the reviewed plan item: {title_source}.",
         sections=sections,
     )
+
+
+def _implementation_objective(
+    objective: str, title: str, acceptance_criteria: Sequence[str]
+) -> str:
+    """Replace plan placeholders with a description grounded in passed behavior."""
+    normalized = " ".join(objective.casefold().split())
+    generic_objective = re.search(
+        r"\b(?:deliver|implement|complete)\b.{0,100}"
+        r"\b(?:allocated|reviewed|planned|repository)\b.{0,40}"
+        r"\b(?:implementation\s+)?(?:work\s+)?(?:units?|behavior|work)\b",
+        normalized,
+    )
+    if generic_objective is None:
+        return objective
+
+    behaviors = "; ".join(criterion.rstrip(".; ") for criterion in acceptance_criteria)
+    return f"{title.rstrip('.; ')}: {behaviors}."
 
 
 def _render_plan_amendment_publication_request(

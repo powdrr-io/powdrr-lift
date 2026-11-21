@@ -1,0 +1,41 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1653
+title: Describe functionality in generated PR objectives
+intent:
+  problem: Implementation PRs copied generic plan objectives such as "Deliver the allocated implementation units" even when their titles and passed acceptance criteria described concrete behavior.
+  goal: Replace generic implementation objectives with a description grounded in the PR title and accepted behaviors while preserving objectives that already describe functionality.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/clean_pr_publisher.py
+    type: modified
+    span: {start_line: 272, end_line: 272}
+    summary: Render the implementation objective from the proposed objective, title, and acceptance criteria.
+    rationale: Ensure generic plan placeholders are replaced before the PR description is assembled.
+  - path: src/powdrr_lift/clean_pr_publisher.py
+    type: modified
+    span: {start_line: 300, end_line: 317}
+    summary: Replace recognized generic objectives with the PR title and accepted behavior criteria.
+    rationale: Make generated objectives describe the functionality represented by the implementation PR while retaining already functional plan objectives.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 240, end_line: 243}
+    summary: Use a generic repository-work objective in the publication renderer fixture.
+    rationale: Exercise the placeholder form found in generated implementation plans.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 281, end_line: 284}
+    summary: Assert that the generated PR objective includes the title and accepted behavior.
+    rationale: Verify the generic placeholder is replaced with functionality-specific text.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 299, end_line: 311}
+    summary: Cover generic-objective replacement and preservation of a functional objective.
+    rationale: Prevent implementation PR descriptions from regressing to generic plan placeholders.
+entities: []
+entity_relationships: []
+invariants:
+  - id: implementation-pr-objective-describes-accepted-behavior
+    description: A generic implementation objective is replaced by the PR title and acceptance criteria that passed implementation gates; a functional objective is preserved.
+    action: added
+guidance: []

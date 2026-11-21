@@ -505,6 +505,60 @@ def _mark_abandoned_claims_for_reconciliation(
             "The worker retains responsibility for reconciling the durable "
             "checkpoint, worktree, and any pull request before resuming.",
         )
+        _recover_published_pull_request(
+            client=client, issue=refreshed, claim_path=claim_path
+        )
+
+
+def _recover_published_pull_request(
+    *,
+    client: GitHubIssueClient,
+    issue: QueueIssue,
+    claim_path: Path,
+) -> None:
+    """Resume CI observation when an abandoned attempt already published one PR."""
+    pattern = re.compile(
+        rf"^Powdrr PR for issue #{issue.number}: "
+        r"(https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+)\s*$",
+        re.MULTILINE,
+    )
+    urls = {
+        match.group(1)
+        for comment in client.list_comments(issue.number)
+        if isinstance(comment.get("body"), str)
+        for match in pattern.finditer(comment["body"])
+    }
+    numbers = {
+        number
+        for url in urls
+        if (number := _same_repository_pull_request_number(url, client.repository))
+        is not None
+    }
+    if len(numbers) != 1:
+        return
+    pull_request = client.pull_request(next(iter(numbers)))
+    if pull_request.get("state") != "open" or not _pull_request_closes_issue(
+        pull_request.get("body"),
+        repository=client.repository,
+        issue_number=issue.number,
+    ):
+        return
+    record = dict(_read_json_mapping(claim_path))
+    record.update(
+        state="awaiting_ci",
+        recovery_state="published_pr_recovered",
+        pull_request_number=next(iter(numbers)),
+        pull_request_url=next(iter(urls)),
+        pull_request_head=pull_request.get("head", {}).get("sha")
+        if isinstance(pull_request.get("head"), Mapping)
+        else None,
+    )
+    _atomic_write_json(claim_path, record)
+    current = client.get_issue(issue.number)
+    client.update_issue(
+        current,
+        labels=_replace_queue_status(current.labels, "awaiting_ci"),
+    )
 
 
 def _read_json_mapping(path: Path) -> Mapping[str, Any]:

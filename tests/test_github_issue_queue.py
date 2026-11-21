@@ -190,6 +190,65 @@ def test_worker_fences_abandoned_claim_until_reconciliation(tmp_path: Path) -> N
     )
 
 
+def test_abandoned_published_pr_resumes_ci_observation(tmp_path: Path) -> None:
+    issue = QueueIssue(17, "Task", "", "open", (QUEUE_LABELS["blocked"],), "")
+    client = FakeIssueClient((issue,))
+    pull_request_url = "https://github.com/example/project/pull/42"
+    client.comments.append((17, f"Powdrr PR for issue #17: {pull_request_url}"))
+    client.pull_requests[42] = {
+        "state": "open",
+        "body": "Implements the task.\n\nCloses #17",
+        "head": {"sha": "a" * 40},
+    }
+    claim_path = tmp_path / "issue-17.json"
+    claim_path.write_text(
+        json.dumps({"state": "reconciliation_required", "generation": 2}),
+        encoding="utf-8",
+    )
+
+    github_issue_queue._recover_published_pull_request(
+        client=client, issue=issue, claim_path=claim_path
+    )
+
+    claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    assert claim["state"] == "awaiting_ci"
+    assert claim["pull_request_number"] == 42
+    assert claim["pull_request_head"] == "a" * 40
+    assert QUEUE_LABELS["awaiting_ci"] in client.get_issue(17).labels
+
+
+def test_abandoned_publication_with_multiple_prs_stays_unresolved(
+    tmp_path: Path,
+) -> None:
+    issue = QueueIssue(18, "Task", "", "open", (QUEUE_LABELS["blocked"],), "")
+    client = FakeIssueClient((issue,))
+    for number in (42, 43):
+        client.comments.append(
+            (
+                18,
+                f"Powdrr PR for issue #18: "
+                f"https://github.com/example/project/pull/{number}",
+            )
+        )
+        client.pull_requests[number] = {
+            "state": "open",
+            "body": "Closes #18",
+        }
+    claim_path = tmp_path / "issue-18.json"
+    claim_path.write_text(
+        json.dumps({"state": "reconciliation_required", "generation": 2}),
+        encoding="utf-8",
+    )
+
+    github_issue_queue._recover_published_pull_request(
+        client=client, issue=issue, claim_path=claim_path
+    )
+
+    claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    assert claim["state"] == "reconciliation_required"
+    assert QUEUE_LABELS["blocked"] in client.get_issue(18).labels
+
+
 def test_worker_executes_independent_items_concurrently(tmp_path: Path) -> None:
     first_item = PlannedWorkItem(
         "first",

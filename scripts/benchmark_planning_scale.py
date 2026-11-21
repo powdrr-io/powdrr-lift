@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import sys
 import time
 from collections import Counter, defaultdict
@@ -166,6 +167,8 @@ def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
             "profile",
             "provider",
             "model",
+            "decision_provider",
+            "decision_model",
             "concurrency",
             "provider_timeout_seconds",
             "terminal_status",
@@ -176,6 +179,9 @@ def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
             "plan_items",
             "provider_api_calls",
             "provider_requests",
+            "provider_call_count",
+            "provider_call_latency_ms",
+            "reported_cost",
             "max_batch_members_by_question_kind",
             "accepted_answer_pages",
             "deterministic_answers",
@@ -201,6 +207,107 @@ def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "unresolved_question_count": len(report.get("pending_questions", ())),
         "compile_error": report.get("compile_error"),
+    }
+
+
+def provider_usage_summary(metrics: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Summarize provider-reported usage without assigning batch costs to members."""
+    expected_calls = sum(
+        value
+        for metric in metrics
+        if isinstance((value := metric.get("api_calls")), int)
+        and not isinstance(value, bool)
+        and value >= 0
+    )
+    provider_calls = [
+        item
+        for metric in metrics
+        for item in (
+            metric.get("provider_calls")
+            if isinstance(metric.get("provider_calls"), list)
+            else []
+        )
+        if isinstance(item, Mapping)
+    ]
+    elapsed_values = [
+        float(elapsed)
+        for call in provider_calls
+        if isinstance((elapsed := call.get("elapsed_ms")), (int, float))
+        and not isinstance(elapsed, bool)
+        and math.isfinite(elapsed)
+        and elapsed >= 0
+    ]
+    cost_by_currency: dict[str, float] = defaultdict(float)
+    missing_cost = 0
+    prompt_tokens = completion_tokens = 0
+    token_records = 0
+    for call in provider_calls:
+        amount = call.get("cost_amount")
+        currency = call.get("cost_currency")
+        if (
+            isinstance(amount, (int, float))
+            and not isinstance(amount, bool)
+            and math.isfinite(amount)
+            and amount >= 0
+            and isinstance(currency, str)
+            and currency.strip()
+        ):
+            cost_by_currency[currency.strip()] += float(amount)
+        else:
+            missing_cost += 1
+        prompt = call.get("prompt_tokens")
+        completion = call.get("completion_tokens")
+        if (
+            isinstance(prompt, int)
+            and not isinstance(prompt, bool)
+            and prompt >= 0
+            and isinstance(completion, int)
+            and not isinstance(completion, bool)
+            and completion >= 0
+        ):
+            prompt_tokens += prompt
+            completion_tokens += completion
+            token_records += 1
+
+    currencies = sorted(cost_by_currency)
+    unreported_calls = missing_cost + max(0, expected_calls - len(provider_calls))
+    if not cost_by_currency:
+        cost_status = "unknown"
+    elif len(currencies) > 1:
+        cost_status = "mixed_currency"
+    elif unreported_calls == 0 and len(provider_calls) == expected_calls:
+        cost_status = "complete"
+    else:
+        cost_status = "partial"
+    tokens_known = len(provider_calls) == expected_calls and token_records == len(
+        provider_calls
+    )
+    return {
+        "provider_call_count": len(provider_calls),
+        "provider_call_latency_ms": {
+            "known_count": len(elapsed_values),
+            "total": round(sum(elapsed_values), 3),
+            "average": round(sum(elapsed_values) / len(elapsed_values), 3)
+            if elapsed_values
+            else None,
+            "maximum": round(max(elapsed_values), 3) if elapsed_values else None,
+        },
+        "prompt_tokens": prompt_tokens if tokens_known else None,
+        "completion_tokens": completion_tokens if tokens_known else None,
+        "token_usage_known": tokens_known,
+        "reported_cost": {
+            "status": cost_status,
+            "known_subtotal": round(cost_by_currency[currencies[0]], 8)
+            if len(currencies) == 1
+            else None,
+            "known_subtotals_by_currency": {
+                currency: round(cost_by_currency[currency], 8)
+                for currency in currencies
+            },
+            "currency": currencies[0] if len(currencies) == 1 else None,
+            "reported_calls": len(provider_calls) - missing_cost,
+            "unreported_calls": unreported_calls,
+        },
     }
 
 
@@ -886,8 +993,6 @@ def run_profile(
     by_question_kind: dict[str, dict[str, int]] = defaultdict(
         lambda: {"questions": 0, "api_calls": 0}
     )
-    prompt_tokens = completion_tokens = 0
-    token_usage_known = True
     for metric in calls:
         phase = str(metric["phase"])
         by_phase[phase]["questions"] += len(metric["question_ids"])
@@ -899,13 +1004,7 @@ def run_profile(
                 if isinstance(kind, str):
                     by_question_kind[kind]["questions"] += len(metric["question_ids"])
                     by_question_kind[kind]["api_calls"] += int(metric["api_calls"])
-        prompt = metric.get("prompt_tokens")
-        completion = metric.get("completion_tokens")
-        if isinstance(prompt, int) and isinstance(completion, int):
-            prompt_tokens += prompt
-            completion_tokens += completion
-        else:
-            token_usage_known = False
+    provider_usage = provider_usage_summary(calls)
     max_questions_per_provider_call = max(
         (len(metric["question_ids"]) for metric in calls), default=0
     )
@@ -939,6 +1038,8 @@ def run_profile(
         "profile": profile.name,
         "provider": provider,
         "model": model,
+        "decision_provider": decision_provider,
+        "decision_model": decision_model,
         "concurrency": concurrency,
         "provider_timeout_seconds": timeout_seconds if client is not None else None,
         "terminal_status": result.terminal_status.value,
@@ -972,9 +1073,7 @@ def run_profile(
         ),
         "provider_api_calls": sum(int(metric["api_calls"]) for metric in calls),
         "provider_requests": sum(len(metric["question_ids"]) for metric in calls),
-        "prompt_tokens": prompt_tokens if token_usage_known else None,
-        "completion_tokens": completion_tokens if token_usage_known else None,
-        "token_usage_known": token_usage_known,
+        **provider_usage,
         "max_questions_per_provider_call": max_questions_per_provider_call,
         "max_batch_members_by_question_kind": dict(max_batch_members_by_question_kind),
         "validation_retries": sum(

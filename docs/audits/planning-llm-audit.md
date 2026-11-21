@@ -824,6 +824,18 @@ is estimated from model pricing, and exact prompts/responses are not retained.
 Later changes should be separately reviewable and retain pinned intent, private
 verification, full scenario closure and explicit human decision boundaries.
 
+Live-measurement update: `scripts/benchmark_planning_scale.py --live` now
+summarizes provider-call records directly, including call count, known latency,
+provider-reported token totals, and reported cost coverage by currency. It does
+not spread a batch's usage across member questions, estimate prices, or treat
+missing usage as zero. The compact summary includes the decision provider/model
+as well as the primary provider/model. A live run is still required to collect
+these measurements, and its results are evidence for cost and speed only; they
+do not establish semantic test quality or branch coverage. Run the benchmark
+against a pinned provider/model and profile, preserve its full JSON artifact, and
+review generated test scenarios against the source before drawing quality
+conclusions.
+
 ## 12. Measurement, gaps and handoff
 
 This audit does not measure actual provider routing, run cost/latency, precision

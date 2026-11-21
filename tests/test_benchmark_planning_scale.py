@@ -33,10 +33,125 @@ dependency_candidate_summary = _BENCHMARK.dependency_candidate_summary
 dependency_metrics_for = _BENCHMARK.dependency_metrics_for
 unresolved_question_diagnostics = _BENCHMARK.unresolved_question_diagnostics
 compact_profile_summary = _BENCHMARK.compact_profile_summary
+provider_usage_summary = _BENCHMARK.provider_usage_summary
 planning_report_artifact_path = _BENCHMARK.planning_report_artifact_path
 write_planning_report_artifact = _BENCHMARK.write_planning_report_artifact
 progress_client = _BENCHMARK._ProgressClient
 example_answer_client: Any = _BENCHMARK._ExampleAnswerClient
+
+
+def test_provider_usage_summary_counts_batches_once_and_reports_live_metrics() -> None:
+    report = provider_usage_summary(
+        (
+            {
+                "api_calls": 1,
+                "question_ids": ["question-a", "question-b"],
+                "provider_calls": [
+                    {
+                        "elapsed_ms": 12.5,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 3,
+                        "cost_amount": 0.03,
+                        "cost_currency": "USD",
+                    }
+                ],
+            },
+            {"api_calls": 0, "question_ids": ["question-b"], "provider_calls": []},
+            {
+                "api_calls": 1,
+                "question_ids": ["question-c"],
+                "provider_calls": [
+                    {
+                        "elapsed_ms": 7.5,
+                        "prompt_tokens": 5,
+                        "completion_tokens": 2,
+                        "cost_amount": 0.02,
+                        "cost_currency": "USD",
+                    }
+                ],
+            },
+        )
+    )
+
+    assert report["provider_call_count"] == 2
+    assert report["provider_call_latency_ms"] == {
+        "known_count": 2,
+        "total": 20.0,
+        "average": 10.0,
+        "maximum": 12.5,
+    }
+    assert report["prompt_tokens"] == 15
+    assert report["completion_tokens"] == 5
+    assert report["token_usage_known"] is True
+    assert report["reported_cost"] == {
+        "status": "complete",
+        "known_subtotal": 0.05,
+        "known_subtotals_by_currency": {"USD": 0.05},
+        "currency": "USD",
+        "reported_calls": 2,
+        "unreported_calls": 0,
+    }
+
+
+def test_provider_usage_summary_exposes_partial_unknown_and_mixed_cost() -> None:
+    partial = provider_usage_summary(
+        (
+            {
+                "api_calls": 2,
+                "provider_calls": [
+                    {"cost_amount": 0.2, "cost_currency": "USD"},
+                    {"cost_amount": None, "cost_currency": None},
+                ],
+            },
+        )
+    )
+    unknown = provider_usage_summary(({"api_calls": 1, "provider_calls": []},))
+    mixed = provider_usage_summary(
+        (
+            {
+                "api_calls": 2,
+                "provider_calls": [
+                    {"cost_amount": 0.2, "cost_currency": "USD"},
+                    {"cost_amount": 0.4, "cost_currency": "EUR"},
+                ],
+            },
+        )
+    )
+
+    assert partial["reported_cost"] == {
+        "status": "partial",
+        "known_subtotal": 0.2,
+        "known_subtotals_by_currency": {"USD": 0.2},
+        "currency": "USD",
+        "reported_calls": 1,
+        "unreported_calls": 1,
+    }
+    assert unknown["reported_cost"]["status"] == "unknown"
+    assert unknown["reported_cost"]["unreported_calls"] == 1
+    assert mixed["reported_cost"] == {
+        "status": "mixed_currency",
+        "known_subtotal": None,
+        "known_subtotals_by_currency": {"EUR": 0.4, "USD": 0.2},
+        "currency": None,
+        "reported_calls": 2,
+        "unreported_calls": 0,
+    }
+
+
+def test_provider_usage_summary_marks_missing_records_and_zero_calls_correctly() -> (
+    None
+):
+    missing = provider_usage_summary(
+        ({"api_calls": 2, "provider_calls": [{"prompt_tokens": 1}]},)
+    )
+    no_calls = provider_usage_summary(({"api_calls": 0, "provider_calls": []},))
+
+    assert missing["provider_call_count"] == 1
+    assert missing["token_usage_known"] is False
+    assert missing["reported_cost"]["unreported_calls"] == 2
+    assert no_calls["token_usage_known"] is True
+    assert no_calls["prompt_tokens"] == 0
+    assert no_calls["completion_tokens"] == 0
 
 
 def test_live_scale_shape_accepts_cohesive_work_units_within_size_bounds() -> None:
@@ -301,6 +416,21 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
         "plan_items": 57,
         "provider_api_calls": 900,
         "provider_requests": 1200,
+        "provider_call_count": 900,
+        "provider_call_latency_ms": {
+            "known_count": 900,
+            "total": 9_000,
+            "average": 10.0,
+            "maximum": 22.0,
+        },
+        "reported_cost": {
+            "status": "partial",
+            "known_subtotal": 1.25,
+            "known_subtotals_by_currency": {"USD": 1.25},
+            "currency": "USD",
+            "reported_calls": 800,
+            "unreported_calls": 100,
+        },
         "max_batch_members_by_question_kind": {
             "extract_requirements": 6,
             "propose_work_units": 4,
@@ -353,6 +483,8 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
 
     assert summary["elapsed_seconds"] == 972.3
     assert summary["provider_api_calls"] == 900
+    assert summary["provider_call_count"] == 900
+    assert summary["reported_cost"]["status"] == "partial"
     assert summary["max_batch_members_by_question_kind"] == {
         "extract_requirements": 6,
         "propose_work_units": 4,

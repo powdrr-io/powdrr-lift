@@ -1,0 +1,86 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1656
+title: Report live planning benchmark usage and cost
+intent:
+  problem: The planning scale benchmark counts requests but cannot report provider-call latency, provider-reported usage, or cost coverage accurately for native batches.
+  goal: Summarize per-provider-call usage and cost without duplicating batch usage or estimating missing values, and document the limits of live benchmark evidence.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 827, end_line: 838}
+    summary: Document live benchmark usage reporting and evidence limits.
+    rationale: Separate measurable cost and latency from semantic quality claims.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 18, end_line: 18}
+    summary: Import finite-number validation for provider telemetry.
+    rationale: Ignore invalid infinite measurements rather than emitting unusable summaries.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 170, end_line: 171}
+    summary: Include decision provider and model in compact reports.
+    rationale: Make the source of semantic decisions visible in benchmark output.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 182, end_line: 184}
+    summary: Include provider-call latency and reported cost in compact reports.
+    rationale: Preserve usage metrics in the concise benchmark output.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 213, end_line: 313}
+    summary: Aggregate latency, tokens, and provider-reported cost per provider call.
+    rationale: Count native batches once and expose complete, partial, unknown, and mixed-currency results.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 889, end_line: 890}
+    summary: Remove token totals derived from question-level metrics.
+    rationale: Avoid losing or duplicating aggregate usage from native batches.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1007, end_line: 1007}
+    summary: Replace question-metric summation with provider usage aggregation.
+    rationale: Ensure live reports use provider-call records as the source of truth.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1041, end_line: 1042}
+    summary: Add primary and decision provider/model identities to full reports.
+    rationale: Make provider routing visible for reproducible live measurements.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1076, end_line: 1076}
+    summary: Include provider usage and both provider identities in live reports.
+    rationale: Make benchmark output identify the decision model and reflect provider-reported usage.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 36, end_line: 36}
+    summary: Expose usage aggregation for benchmark unit tests.
+    rationale: Exercise report aggregation without running a live provider.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 43, end_line: 156}
+    summary: Test provider usage aggregation for batches and incomplete records.
+    rationale: Prevent double counting and keep missing or mixed usage explicit.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 419, end_line: 433}
+    summary: Keep provider usage fields in compact benchmark summaries.
+    rationale: Preserve practical cost and latency metrics in console output.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 486, end_line: 487}
+    summary: Assert compact summaries retain provider-call metrics.
+    rationale: Prevent cost coverage and provider-call count from disappearing in console reports.
+entities: []
+entity_relationships: []
+invariants:
+  - id: benchmark-provider-usage-counted-once
+    action: added
+    description: Each provider-call record contributes usage once, including calls serving native batches; member questions do not each receive the batch's usage.
+  - id: benchmark-cost-is-reported-only
+    action: added
+    description: Benchmark cost summaries use only provider-reported amount and currency, preserve known subtotals, and mark incomplete, unknown, or mixed-currency coverage explicitly.
+guidance: []
+features: []
+proposed_prs: []

@@ -152,10 +152,8 @@ def test_worker_fences_abandoned_claim_until_reconciliation(tmp_path: Path) -> N
         client=client,  # type: ignore[arg-type]
     )
     issue = client.issues[0]
-    client.update_issue(
-        issue,
-        labels=github_issue_queue._replace_queue_status(issue.labels, "claimed"),
-    )
+    # A stale or missing queue label must not hide an abandoned durable claim.
+    client.update_issue(issue, labels=())
     claims_dir = github_issue_queue._worker_store_root(tmp_path) / "claims"
     claims_dir.mkdir(parents=True, exist_ok=True)
     github_issue_queue._atomic_write_json(
@@ -186,7 +184,7 @@ def test_worker_fences_abandoned_claim_until_reconciliation(tmp_path: Path) -> N
     assert claim["state"] == "reconciliation_required"
     assert claim["recovery_state"] == "owner_exited"
     assert any(
-        "Reconcile its durable checkpoint" in body
+        "worker retains responsibility" in body
         for number, body in client.comments
         if number == issue.number
     )

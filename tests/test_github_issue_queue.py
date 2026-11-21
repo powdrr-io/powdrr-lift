@@ -155,11 +155,12 @@ def test_worker_requeues_abandoned_claim_for_dependency_reconciliation(
     )
     base_issue, issue = client.issues
     client.update_issue(base_issue, state="closed")
-    client.linked_pull_requests_by_issue[base_issue.number] = (
-        {
-            "html_url": "https://github.com/example/project/pull/123",
-            "body": f"Closes #{base_issue.number}",
-        },
+    client.comments.append(
+        (
+            base_issue.number,
+            f"Powdrr PR for issue #{base_issue.number}: "
+            "https://github.com/example/project/pull/123",
+        )
     )
     client.pull_requests[123] = {
         "state": "closed",

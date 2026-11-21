@@ -72,8 +72,8 @@ files:
   - path: tests/test_github_issue_queue.py
     type: modified
     span: {start_line: 156, end_line: 169}
-    summary: Set up a merged timeline-linked prerequisite for the abandoned follow-up item.
-    rationale: Verify dependency reconciliation can use merged PR timeline evidence.
+    summary: Set up a merged published prerequisite for the abandoned follow-up item.
+    rationale: Isolate claim recovery from timeline-specific dependency evidence covered by the preceding change.
   - path: tests/test_github_issue_queue.py
     type: modified
     span: {start_line: 171, end_line: 171}
